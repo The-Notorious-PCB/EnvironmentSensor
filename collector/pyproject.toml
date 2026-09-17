@@ -1,0 +1,23 @@
+[project]
+name = "collector"
+version = "0.1.0"
+description = "Serial ingest, SQLite storage, WebSocket live feed, and Supabase sync for the EnvironmentSensor project"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pyserial",
+    "sqlmodel",
+    "tenacity",
+    "websockets",
+    "httpx",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
