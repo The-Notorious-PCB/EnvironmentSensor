@@ -8,6 +8,10 @@ for how this fits the overall architecture and
 [`shared/device-registration.md`](../shared/device-registration.md) for
 the registration/auth flow this implements the UI for.
 
+No login — the site is fully public, no accounts anywhere (see
+[`shared/device-registration.md`](../shared/device-registration.md)'s "No
+login" section for why and what it'd take to bring accounts back).
+
 ```
 src/
   lib/
@@ -16,18 +20,17 @@ src/
   types.ts               Supabase row shapes (sensor_arrays, readings,
                           the device_sessions view)
   hooks/
-    useAuth.ts             current Supabase Auth session
-    useDevices.ts            the logged-in user's registered devices
+    useDevices.ts            every registered device (RLS is fully public)
     useDeviceRealtime.ts      Realtime subscription for one device's
                               readings (the Live page)
     useDeviceSessions.ts       past sessions for a device (the History page)
     useSessionReadings.ts       readings for one selected session
   components/
-    NavBar.tsx, RequireAuth.tsx
+    NavBar.tsx
   pages/
-    LogInPage.tsx, SignUpPage.tsx
-    RegisterDevicePage.tsx    register a device, show its API key once
-    DeviceListPage.tsx         your devices, status, last_seen_at
+    RegisterDevicePage.tsx    register a device (no login), show its API
+                              key once
+    DeviceListPage.tsx         every device, status, last_seen_at
     LiveViewPage.tsx            Realtime charts for one device
     HistoryPage.tsx              session picker + charts for one device
 tests/
@@ -66,20 +69,22 @@ reach Supabase, with nothing in the build log to say why.
 `VITE_SUPABASE_ANON_KEY` ends up baked into the built JS bundle — anyone
 who opens the deployed site can read it in devtools. **This is expected
 and fine.** The anon key identifies which Supabase *project* a request is
-for; it is not a credential that grants access on its own. Every table
-this app touches (`sensor_arrays`, `readings`) has Row Level Security
-enabled (see [`supabase/migrations`](../supabase/migrations)) — what a
-signed-in user can read or write is enforced by RLS policies checking
-`auth.uid()`, not by whoever holds this key. An attacker with only the
-anon key can sign up their own account and see only what RLS lets *that*
-account see, same as anyone else. This is exactly how Supabase's own docs
-describe the anon key, and the same model most BaaS platforms (Firebase's
-client config, for example) use.
+for; it is not a credential that grants access on its own. Access here is
+about as open as it gets — the site has no login, and `sensor_arrays`/
+`readings` both have Row Level Security policies that deliberately allow
+anyone (`using (true)`, see
+[`supabase/migrations`](../supabase/migrations)) — so exposing the anon
+key doesn't hand out anything beyond what the site already shows every
+visitor. This is exactly how Supabase's own docs describe the anon key,
+and the same model most BaaS platforms (Firebase's client config, for
+example) use; it just happens that this particular app's RLS policies are
+maximally permissive by design rather than scoped to a user.
 
-What actually must stay secret: a user's password, and a device's API key
-(never exposed by this app — see
-[`shared/device-registration.md`](../shared/device-registration.md)'s
-security notes on `api_key_hash`).
+What actually must stay secret: a device's API key (never exposed by this
+app — see [`shared/device-registration.md`](../shared/device-registration.md)'s
+security notes on `api_key_hash`), which is the one thing here that isn't
+public — knowing a device's `device_id` alone doesn't let you push fake
+readings for it.
 
 ## Routing: HashRouter, not BrowserRouter
 
@@ -115,10 +120,7 @@ neither of which this workflow file can do for you:
    fast with a clear error (see `vite.config.ts`) if these are missing,
    rather than silently deploying a broken site.
 
-I haven't run this workflow — I don't have a way to trigger a real GitHub
-Actions run or GitHub Pages deploy from here. What I did verify locally:
-the exact commands it runs (`npm ci`, then `npm run build` with the two
-env vars set) succeed and produce a `dist/` with the correct base path and
-substituted env values (see the "Env vars" section above). Treat the
-workflow file itself as reviewed-but-unexecuted until it's actually run
-once in CI.
+Live at **https://the-notorious-pcb.github.io/EnvironmentSensor/** — the
+workflow has actually run successfully (both `build` and `deploy` jobs
+passed), not just been reviewed. Every push to `main` touching `website/`
+or `shared-ui/` redeploys it.

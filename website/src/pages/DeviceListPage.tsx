@@ -8,7 +8,7 @@ export function DeviceListPage() {
   return (
     <div>
       <div className="page-header">
-        <h2>Your sensor arrays</h2>
+        <h2>Sensor arrays</h2>
         <Link to="/register" className="button">
           Register a device
         </Link>

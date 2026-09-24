@@ -25,12 +25,12 @@ Suit sensor nodes  --(I2C/UART)-->  Relay box (ESP32/Teensy)
                                   rows, tenacity retry/backoff)
                                        |
                                        v
-                              Supabase (Postgres + REST + Auth + Realtime)
+                              Supabase (Postgres + REST + Realtime)
                                        |
                          +-------------+-------------+
                          v                           v
-              Consumed by digital-twin        website (GitHub Pages)
-              team via REST                   - Supabase Auth login
+              Consumed by digital-twin        website (GitHub Pages,
+              team via REST                   no login, fully public)
                                                - Realtime live view
                                                - REST history view
 ```
@@ -81,8 +81,8 @@ means a corrupt/partial line only costs one reading, not a whole batch.
 | Cloud sync | Background task, batches unsynced SQLite rows, tenacity retry/backoff | Field/analog sites have intermittent connectivity; batching cuts REST call volume, backoff avoids hammering a flaky link, SQLite stays authoritative until a batch is confirmed synced |
 | Frontend | React + Recharts | Live gauges/line charts with threshold-based alert coloring; lighter-weight than D3 for the team's timeline; chart components live in `shared-ui` and are reused across both frontends below |
 | Laptop frontend | dashboard (React + Recharts) | Runs on the laptop during a session, talks to the collector's own WebSocket/REST — works with no internet, since it never needs Supabase |
-| Public frontend | website (React + Recharts, Supabase JS) | Deployed to GitHub Pages, talks to Supabase directly (Auth, Realtime, REST) — no dependency on the collector or a laptop being reachable; `HashRouter` since Pages has no server-side route rewriting |
-| Auth | Supabase Auth (email/password) | Ties a registered device (`sensor_arrays`) to a website account (`owner_id`), so RLS can scope a user to only their own devices/readings |
+| Public frontend | website (React + Recharts, Supabase JS) | Deployed to GitHub Pages, talks to Supabase directly (Realtime, REST) — no dependency on the collector or a laptop being reachable; `HashRouter` since Pages has no server-side route rewriting |
+| Device auth | Postgres RPC (`ingest_readings`) checking an API key hash | No login involved — the site is fully public (see `shared/device-registration.md`'s "No login"), but a device still needs its own API key to push readings, checked inside the RPC rather than via a user session |
 
 ## Repo layout
 
@@ -103,12 +103,12 @@ dashboard/          React + Recharts frontend, laptop-local — talks to the
     pages/         live dashboard, session playback
     hooks/         WebSocket client, data-fetching hooks
   tests/
-website/            React + Recharts frontend, public/cloud — deployed to
-                    GitHub Pages, talks to Supabase directly, separate from
-                    dashboard (see website/README.md)
+website/            React + Recharts frontend, public/cloud, no login —
+                    deployed to GitHub Pages, talks to Supabase directly,
+                    separate from dashboard (see website/README.md)
   src/
-    pages/         auth, device registration/list, live, history
-    hooks/         Supabase Auth/Realtime/REST data-fetching
+    pages/         device registration/list, live, history
+    hooks/         Realtime/REST data-fetching
   tests/
 shared-ui/          chart components + threshold/grouping logic shared
                     between dashboard and website (see shared-ui/README.md)
@@ -153,12 +153,12 @@ serial stream directly. Schema/field changes to the synced rows are a
 breaking-change surface for them — coordinate before renaming or repurposing
 fields in `sensor_type`, `unit`, or the table shape pushed by `collector/app/sync`.
 
-Since [`supabase/migrations`](supabase/migrations) added Row Level
-Security on `readings` (see
-[`shared/device-registration.md`](shared/device-registration.md)), a plain
-anon-key REST read now returns nothing — RLS only allows an authenticated
-device owner to read their own device's rows. The digital-twin team reading
-across all devices/users needs either the service-role key (bypasses RLS
-entirely) or a dedicated RLS policy scoped to them specifically; this
-hasn't been decided yet — raise it with them before they hit an
-empty-results surprise.
+[`supabase/migrations`](supabase/migrations) added Row Level Security on
+`readings`, but the site has no login (see
+[`shared/device-registration.md`](shared/device-registration.md)'s "No
+login") and the RLS policies are deliberately fully public
+(`using (true)`) — so a plain anon-key REST read already returns every
+device's rows, no special access needed. This wasn't always true (an
+earlier per-user-ownership design would have blocked this), so it's worth
+a heads-up to the digital-twin team regardless: don't assume today's open
+access is permanent if per-user accounts ever come back.

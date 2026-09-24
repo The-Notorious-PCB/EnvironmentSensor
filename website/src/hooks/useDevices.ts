@@ -8,9 +8,9 @@ export interface UseDevices {
   error: string | null;
 }
 
-/** The logged-in user's registered devices. RLS on `sensor_arrays` (see
- * supabase/migrations) scopes this to `owner_id = auth.uid()` automatically
- * — no explicit filter needed here.
+/** Every registered device — the site is fully public, no per-user
+ * scoping (see shared/device-registration.md). RLS on `sensor_arrays`
+ * still applies (see supabase/migrations), it just allows everyone.
  */
 export function useDevices(): UseDevices {
   const [devices, setDevices] = useState<SensorArrayRow[]>([]);
