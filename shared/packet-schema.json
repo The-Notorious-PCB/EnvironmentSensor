@@ -14,8 +14,8 @@
     },
     "sensor_type": {
       "type": "string",
-      "enum": ["o2", "co2", "temp", "humidity", "pressure", "particulate_pm1", "particulate_pm25"],
-      "description": "Extend this enum rather than repurposing an existing value."
+      "enum": ["o2", "co2", "temperature", "humidity", "pressure"],
+      "description": "Must match sensor-types.json (the canonical list, checked by collector/tests/test_sensor_types.py). Extend rather than repurposing an existing value. More sensor types (e.g. particulates) are anticipated but not yet defined — see shared/packet-schema.md."
     },
     "value": {
       "type": "number"

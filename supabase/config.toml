@@ -1,0 +1,25 @@
+# Supabase CLI project config. Not a running service by itself — this is
+# what `supabase start` (local dev) and `supabase db push` (deploy
+# migrations) read. See supabase/README.md.
+
+project_id = "environment-sensor"
+
+[db]
+port = 54322
+
+[auth]
+enabled = true
+# Website origins allowed to complete an auth redirect (magic link / OAuth
+# callback). Update once the registration website has a real URL; the
+# dashboard's dev server is listed so local testing works out of the box.
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173"]
+
+[auth.email]
+enable_signup = true
+# Off for frictionless local dev/testing only. This file governs the local
+# CLI stack (`supabase start`); it does not configure the hosted project —
+# set email confirmation there deliberately (Dashboard -> Authentication ->
+# Providers -> Email) before real users can register, or signup is open to
+# anyone with a throwaway address.
+enable_confirmations = false

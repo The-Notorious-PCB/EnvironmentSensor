@@ -17,8 +17,9 @@ documented up front.
 
 ## Packet format it must emit
 
-See [`../shared/packet-schema.json`](../shared/packet-schema.json) for the
-authoritative schema. One example line:
+See [`../shared/packet-schema.md`](../shared/packet-schema.md) (human-readable
+spec) and [`../shared/packet-schema.json`](../shared/packet-schema.json)
+(machine-readable) for the authoritative schema. One example line:
 
 ```json
 {"node_id": "helmet-01", "sensor_type": "co2", "value": 812.4, "unit": "ppm", "timestamp": "2026-09-17T14:03:21.482Z", "seq": 10432, "crc16": "3af1"}
@@ -34,8 +35,15 @@ Rules:
 - `timestamp`: ISO 8601 UTC.
 - `seq`: uint32, monotonic per `node_id`, wraps rather than resets, so the
   collector can detect drops.
-- `crc16`: hex string, computed over the other fields in a fixed order (TBD
-  alongside firmware implementation) so both sides compute it identically.
+- `crc16`: CRC-16/CCITT-FALSE (poly `0x1021`, init `0xFFFF`), computed over
+  the compact-JSON, sorted-key encoding of every field except `crc16`
+  itself — e.g. Python's `json.dumps(fields, sort_keys=True,
+  separators=(",", ":"))`, UTF-8 encoded. See `collector/app/serial/parser.py`
+  (`compute_crc16`/`canonical_payload`) for the reference implementation;
+  the firmware side needs to reproduce that exact encoding byte-for-byte.
+  This is the collector-side placeholder for what should really be settled
+  with whoever builds the firmware — flag it for review before relying on
+  it.
 
 A corrupt/partial line should cost the collector exactly one reading, not the
 session — do not batch multiple readings into one line.

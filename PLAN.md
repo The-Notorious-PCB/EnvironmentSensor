@@ -108,3 +108,27 @@ in Supabase (or mock).
 - One end-to-end smoke test/script wiring M3 through M5 together.
 - README pass on `collector/` and `dashboard/` reflecting what's actually
   built vs. still planned.
+
+## M9 — Public website (device auth, live + history)
+
+Demo: sign up on the website, register a device (API key shown once),
+configure a collector with it, watch readings arrive in the website's live
+view within a few seconds, then browse that session in the history view —
+all without the laptop dashboard or the collector's local network involved.
+
+- `supabase/migrations`: `sensor_arrays` table, `device_id` on `readings`,
+  RLS, `register_device`/`ingest_readings` RPCs (device auth — see
+  `shared/device-registration.md`), plus the `device_sessions` view and
+  Realtime publication the pages below need.
+- `collector/app/sync/worker.py`: calls `ingest_readings` with the
+  device's id/API key instead of a raw table POST.
+- `shared-ui`: chart components (`ThresholdLineChart`, `SensorGauge`,
+  `SensorPanel`) and threshold/grouping logic extracted out of `dashboard`
+  so `website` reuses them rather than duplicating.
+- `website`: Supabase Auth pages, device registration/list, a Realtime-fed
+  live view (labeled near-real-time, not instant), a history view querying
+  Supabase REST directly. `HashRouter`, deployed to GitHub Pages via
+  `.github/workflows/deploy-website.yml`.
+- Tests: `shared-ui` (pure logic), `website` (pure logic — `format.ts`);
+  migration behavior verified by hand against local Postgres (RLS
+  isolation, API-key auth, upsert idempotency), not just reviewed.

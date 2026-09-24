@@ -3,8 +3,9 @@
 Analog astronaut spacesuit environmental sensor system (Colorado Space Grant
 Consortium capstone). Tracks O2, CO2, temperature, humidity, pressure, and
 particulates inside a suit/helmet in real time, logs it durably, and feeds a
-live web dashboard plus a cloud API that a separate team consumes to drive a
-digital twin.
+live laptop dashboard, a public website (near-real-time view + history, by
+device), and a cloud API that a separate team consumes to drive a digital
+twin.
 
 ## Architecture
 
@@ -24,10 +25,14 @@ Suit sensor nodes  --(I2C/UART)-->  Relay box (ESP32/Teensy)
                                   rows, tenacity retry/backoff)
                                        |
                                        v
-                              Supabase (Postgres + REST)
+                              Supabase (Postgres + REST + Auth + Realtime)
                                        |
-                                       v
-                        Consumed by digital-twin team via REST
+                         +-------------+-------------+
+                         v                           v
+              Consumed by digital-twin        website (GitHub Pages)
+              team via REST                   - Supabase Auth login
+                                               - Realtime live view
+                                               - REST history view
 ```
 
 Data flow is one-way and durable at every hop: sensor nodes -> relay box (with
@@ -47,9 +52,10 @@ reading (not batched):
 
 - `node_id`: `<location>-<index>`, e.g. `helmet-01`, `chest-01`, lowercase,
   hyphenated.
-- `sensor_type`: lowercase enum — `o2`, `co2`, `temp`, `humidity`, `pressure`,
-  `particulate_pm1`, `particulate_pm25`, etc. Extend the enum rather than
-  overloading an existing value.
+- `sensor_type`: lowercase enum — `o2`, `co2`, `temperature`, `humidity`,
+  `pressure` today; see [shared/packet-schema.md](shared/packet-schema.md)
+  for the authoritative list. Extend the enum rather than overloading an
+  existing value (e.g. particulates are anticipated but not yet defined).
 - `value`/`unit`: SI where practical (`degC`, `kPa`, `%RH`, `ppm`, `ug/m3`).
 - `timestamp`: ISO 8601 UTC, set on the relay box (nodes are not assumed to
   have wall-clock time).
@@ -73,27 +79,46 @@ means a corrupt/partial line only costs one reading, not a whole batch.
 | Live push | WebSocket | Dashboard needs continuous live readings, not poll-and-diff |
 | Cloud store | Supabase (Postgres + REST) | Gives the digital-twin team a REST API to consume directly, no custom endpoint needed on our side; managed Postgres avoids self-hosting |
 | Cloud sync | Background task, batches unsynced SQLite rows, tenacity retry/backoff | Field/analog sites have intermittent connectivity; batching cuts REST call volume, backoff avoids hammering a flaky link, SQLite stays authoritative until a batch is confirmed synced |
-| Frontend | React + Recharts | Live gauges/line charts with threshold-based alert coloring; lighter-weight than D3 for the team's timeline; same chart components serve both the live view and session playback |
+| Frontend | React + Recharts | Live gauges/line charts with threshold-based alert coloring; lighter-weight than D3 for the team's timeline; chart components live in `shared-ui` and are reused across both frontends below |
+| Laptop frontend | dashboard (React + Recharts) | Runs on the laptop during a session, talks to the collector's own WebSocket/REST — works with no internet, since it never needs Supabase |
+| Public frontend | website (React + Recharts, Supabase JS) | Deployed to GitHub Pages, talks to Supabase directly (Auth, Realtime, REST) — no dependency on the collector or a laptop being reachable; `HashRouter` since Pages has no server-side route rewriting |
+| Auth | Supabase Auth (email/password) | Ties a registered device (`sensor_arrays`) to a website account (`owner_id`), so RLS can scope a user to only their own devices/readings |
 
-## Repo layout (intended)
+## Repo layout
 
 ```
 firmware/          ESP32/Teensy relay box firmware (sensor read, NDJSON
-                    framing, CRC16, SD logging, USB serial output)
-backend/
+                    framing, CRC16, SD logging, USB serial output) — out of
+                    scope to implement here, see firmware/README.md
+collector/          Python + FastAPI service (see collector/README.md)
   app/
     serial/        pyserial reader, NDJSON parsing + CRC validation
     models/        SQLModel table + API schema definitions
     api/           FastAPI routes (REST + WebSocket)
     sync/          Supabase batch sync worker (tenacity retry/backoff)
   tests/
-frontend/
+dashboard/          React + Recharts frontend, laptop-local — talks to the
+                    collector's own API (see dashboard/README.md)
   src/
-    components/    gauges, charts, alert indicators
     pages/         live dashboard, session playback
     hooks/         WebSocket client, data-fetching hooks
   tests/
-docs/               protocol spec, hardware notes, CAD/system specs
+website/            React + Recharts frontend, public/cloud — deployed to
+                    GitHub Pages, talks to Supabase directly, separate from
+                    dashboard (see website/README.md)
+  src/
+    pages/         auth, device registration/list, live, history
+    hooks/         Supabase Auth/Realtime/REST data-fetching
+  tests/
+shared-ui/          chart components + threshold/grouping logic shared
+                    between dashboard and website (see shared-ui/README.md)
+shared/             cross-component contract: packet schema, sensor-type
+                    list, device-registration flow — see shared/README.md
+supabase/           Supabase migrations + auth config for the cloud side —
+                    see supabase/README.md
+.github/workflows/  CI — deploy-website.yml builds+publishes website/ to
+                    GitHub Pages
+PLAN.md             milestone breakdown
 ```
 
 ## Conventions
@@ -126,4 +151,14 @@ docs/               protocol spec, hardware notes, CAD/system specs
 They consume readings via the Supabase REST API, not our local SQLite or
 serial stream directly. Schema/field changes to the synced rows are a
 breaking-change surface for them — coordinate before renaming or repurposing
-fields in `sensor_type`, `unit`, or the table shape pushed by `backend/app/sync`.
+fields in `sensor_type`, `unit`, or the table shape pushed by `collector/app/sync`.
+
+Since [`supabase/migrations`](supabase/migrations) added Row Level
+Security on `readings` (see
+[`shared/device-registration.md`](shared/device-registration.md)), a plain
+anon-key REST read now returns nothing — RLS only allows an authenticated
+device owner to read their own device's rows. The digital-twin team reading
+across all devices/users needs either the service-role key (bypasses RLS
+entirely) or a dedicated RLS policy scoped to them specifically; this
+hasn't been decided yet — raise it with them before they hit an
+empty-results surprise.
