@@ -9,7 +9,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useMemo } from "react";
 import { THRESHOLDS } from "../config/thresholds";
+import { fitAxis } from "../lib/axisDomain";
 import type { SeriesByNode } from "../lib/groupReadings";
 import type { SensorType } from "../types";
 
@@ -35,12 +37,25 @@ export interface ThresholdLineChartProps {
  * are drawn as background shading rather than coloring the line itself,
  * since a single node can have multiple points at different statuses.
  *
+ * The y-axis fits the data (see lib/axisDomain.ts) rather than spanning the
+ * sensor's whole display range, so small changes are visible; the bands are
+ * clipped to whatever range is showing.
+ *
  * Consuming apps must define the CSS custom properties `--chart-grid` and
  * `--chart-axis` (see shared-ui/README.md).
  */
 export function ThresholdLineChart({ sensorType, seriesByNode, height = 200 }: ThresholdLineChartProps) {
   const threshold = THRESHOLDS[sensorType];
   const nodeIds = Object.keys(seriesByNode);
+  const axis = useMemo(
+    () =>
+      fitAxis(
+        nodeIds.flatMap((id) => seriesByNode[id].map((point) => point.value)),
+        threshold.minSpan,
+        [threshold.min, threshold.max],
+      ),
+    [seriesByNode, threshold],
+  );
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -55,7 +70,9 @@ export function ThresholdLineChart({ sensorType, seriesByNode, height = 200 }: T
           tick={{ fontSize: 11 }}
         />
         <YAxis
-          domain={[threshold.min, threshold.max]}
+          domain={axis.domain}
+          ticks={axis.ticks.length ? axis.ticks : undefined}
+          allowDataOverflow
           stroke="var(--chart-axis)"
           tick={{ fontSize: 11 }}
           width={44}
@@ -64,21 +81,23 @@ export function ThresholdLineChart({ sensorType, seriesByNode, height = 200 }: T
           labelFormatter={formatTime}
           formatter={(value: number) => [`${value} ${threshold.unit}`, sensorType]}
         />
-        <ReferenceArea y1={threshold.min} y2={threshold.warnRange[0]} fill="#ef4444" fillOpacity={0.08} />
+        <ReferenceArea ifOverflow="hidden" y1={threshold.min} y2={threshold.warnRange[0]} fill="#ef4444" fillOpacity={0.08} />
         <ReferenceArea
+          ifOverflow="hidden"
           y1={threshold.warnRange[0]}
           y2={threshold.okRange[0]}
           fill="#eab308"
           fillOpacity={0.08}
         />
-        <ReferenceArea y1={threshold.okRange[0]} y2={threshold.okRange[1]} fill="#22c55e" fillOpacity={0.06} />
+        <ReferenceArea ifOverflow="hidden" y1={threshold.okRange[0]} y2={threshold.okRange[1]} fill="#22c55e" fillOpacity={0.06} />
         <ReferenceArea
+          ifOverflow="hidden"
           y1={threshold.okRange[1]}
           y2={threshold.warnRange[1]}
           fill="#eab308"
           fillOpacity={0.08}
         />
-        <ReferenceArea y1={threshold.warnRange[1]} y2={threshold.max} fill="#ef4444" fillOpacity={0.08} />
+        <ReferenceArea ifOverflow="hidden" y1={threshold.warnRange[1]} y2={threshold.max} fill="#ef4444" fillOpacity={0.08} />
         {nodeIds.map((nodeId, i) => (
           <Line
             key={nodeId}

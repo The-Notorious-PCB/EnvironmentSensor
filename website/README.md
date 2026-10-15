@@ -49,6 +49,22 @@ cp .env.example .env.local   # fill in real values
 npm run dev
 ```
 
+### Seeing real data without a real device
+
+[`../scripts/simulate_device.py`](../scripts/simulate_device.py) POSTs to
+the same `ingest_readings` RPC the collector's real sync worker uses, so it
+puts real rows in front of the Live/History pages without a relay box or
+collector running:
+
+```
+SUPABASE_URL=... SUPABASE_ANON_KEY=...  \  # same values as .env.local
+  python3 ../scripts/simulate_device.py       # 5 real minutes, watch Live update
+  python3 ../scripts/simulate_device.py --fast # instant, for History view only
+```
+
+Registers (or reuses) a device named "test" — see the script's own
+docstring for details.
+
 `npm run typecheck`, `npm test`, `npm run build` also work from here.
 
 ## Env vars (build-time, Vite)

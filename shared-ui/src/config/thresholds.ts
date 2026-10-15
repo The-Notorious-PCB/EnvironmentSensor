@@ -6,6 +6,10 @@ export interface SensorThreshold {
   /** Chart/gauge axis range — not a safety bound, just the display domain. */
   min: number;
   max: number;
+  /** Narrowest y-axis span a line chart zooms to when fitting the data —
+   * roughly the sensor's noise/accuracy, so jitter doesn't fill the chart
+   * and read as a real change. */
+  minSpan: number;
   /** Inclusive "safe" range — green. */
   okRange: [number, number];
   /** Inclusive range beyond okRange that's still tolerable — yellow.
@@ -30,6 +34,7 @@ export const THRESHOLDS: Record<SensorType, SensorThreshold> = {
     unit: "kPa",
     min: 0,
     max: 30,
+    minSpan: 0.5,
     okRange: [19.5, 23.5],
     warnRange: [16, 25],
   },
@@ -38,6 +43,7 @@ export const THRESHOLDS: Record<SensorType, SensorThreshold> = {
     unit: "ppm",
     min: 0,
     max: 5000,
+    minSpan: 100,
     okRange: [0, 1000],
     warnRange: [0, 2000],
   },
@@ -46,6 +52,7 @@ export const THRESHOLDS: Record<SensorType, SensorThreshold> = {
     unit: "degC",
     min: -10,
     max: 50,
+    minSpan: 0.5,
     okRange: [15, 30],
     warnRange: [5, 40],
   },
@@ -54,6 +61,7 @@ export const THRESHOLDS: Record<SensorType, SensorThreshold> = {
     unit: "%RH",
     min: 0,
     max: 100,
+    minSpan: 1,
     okRange: [20, 60],
     warnRange: [10, 80],
   },
@@ -62,6 +70,7 @@ export const THRESHOLDS: Record<SensorType, SensorThreshold> = {
     unit: "kPa",
     min: 0,
     max: 150,
+    minSpan: 0.1,
     okRange: [95, 105],
     warnRange: [80, 120],
   },

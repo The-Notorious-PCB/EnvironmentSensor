@@ -7,6 +7,9 @@ export type { ThresholdStatus } from "./lib/thresholdStatus";
 export { groupBySensorAndNode } from "./lib/groupReadings";
 export type { SeriesPoint, SeriesByNode } from "./lib/groupReadings";
 
+export { fitAxis } from "./lib/axisDomain";
+export type { AxisFit } from "./lib/axisDomain";
+
 export type { SensorType, MinimalReading } from "./types";
 
 export { ThresholdLineChart } from "./components/ThresholdLineChart";
