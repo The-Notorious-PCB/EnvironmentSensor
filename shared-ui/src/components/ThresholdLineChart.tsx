@@ -79,6 +79,9 @@ export function ThresholdLineChart({ sensorType, seriesByNode, height = 200 }: T
         />
         <Tooltip
           labelFormatter={formatTime}
+          // The tooltip box is always white, but its label inherits the page's
+          // text color, which is near-white on the dark theme.
+          labelStyle={{ color: "#000" }}
           formatter={(value: number) => [`${value} ${threshold.unit}`, sensorType]}
         />
         <ReferenceArea ifOverflow="hidden" y1={threshold.min} y2={threshold.warnRange[0]} fill="#ef4444" fillOpacity={0.08} />
