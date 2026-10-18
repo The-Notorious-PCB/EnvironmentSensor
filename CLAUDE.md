@@ -47,7 +47,7 @@ NDJSON over USB serial, one JSON object per line, one packet per sensor
 reading (not batched):
 
 ```json
-{"node_id": "helmet-01", "sensor_type": "co2", "value": 812.4, "unit": "ppm", "timestamp": "2026-09-17T14:03:21.482Z", "seq": 10432, "crc16": "3af1"}
+{"node_id": "helmet-01", "sensor_type": "co2", "value": 812.4, "unit": "ppm", "timestamp": "2026-09-17T14:03:21.482Z", "seq": 10432, "crc16": "9ca5"}
 ```
 
 - `node_id`: `<location>-<index>`, e.g. `helmet-01`, `chest-01`, lowercase,
@@ -58,8 +58,12 @@ reading (not batched):
   existing value (e.g. particulates are anticipated but not yet defined).
 - `value`/`unit`: SI where practical (`degC`, `kPa`, `%RH`, `ppm`, `ug/m3`).
 - `timestamp`: ISO 8601 UTC, set on the relay box (nodes are not assumed to
-  have wall-clock time).
-- `seq`: monotonic per-node uint32, used to detect dropped packets.
+  have wall-clock time). The relay box has no clock either: the collector
+  writes `T<unix epoch ms>\n` to the port on connect and every 10 s, and the
+  relay stamps from that.
+- `seq`: monotonic per-node uint32, used to detect dropped packets. Must not
+  repeat within a session, even across a relay reboot: the collector drops
+  a repeated `(session_id, node_id, seq)` as a duplicate.
 - `crc16`: covers the other fields; receiver discards and logs (doesn't
   crash on) a line that fails CRC — serial links drop/corrupt bytes.
 
@@ -87,9 +91,9 @@ means a corrupt/partial line only costs one reading, not a whole batch.
 ## Repo layout
 
 ```
-firmware/          ESP32/Teensy relay box firmware (sensor read, NDJSON
-                    framing, CRC16, SD logging, USB serial output) — out of
-                    scope to implement here, see firmware/README.md
+firmware/          contract for relay box firmware (see firmware/README.md);
+                    the breadboard implementation is the separate
+                    BreadBoardTest repo
 collector/          Python + FastAPI service (see collector/README.md)
   app/
     serial/        pyserial reader, NDJSON parsing + CRC validation
@@ -110,12 +114,15 @@ website/            React + Recharts frontend, public/cloud, no login —
     pages/         device registration/list, live, history
     hooks/         Realtime/REST data-fetching
   tests/
-shared-ui/          chart components + threshold/grouping logic shared
-                    between dashboard and website (see shared-ui/README.md)
+shared-ui/          chart components, thresholds, grouping and per-node
+                    lag-compensated estimates, shared by dashboard and
+                    website (see shared-ui/README.md)
 shared/             cross-component contract: packet schema, sensor-type
                     list, device-registration flow — see shared/README.md
 supabase/           Supabase migrations + auth config for the cloud side —
                     see supabase/README.md
+scripts/            record.py (register + record a session in one command),
+                    simulate_device.py (fake readings for the website)
 .github/workflows/  CI — deploy-website.yml builds+publishes website/ to
                     GitHub Pages
 PLAN.md             milestone breakdown

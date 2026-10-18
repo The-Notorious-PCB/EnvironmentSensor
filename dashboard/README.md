@@ -14,9 +14,12 @@ src/
   lib/api.ts               REST fetch + WebSocket URL helpers
   hooks/
     useLiveReadings.ts       /ws/live client — latest value + rolling
-                             history per sensor_type, auto-reconnects
+                             history per sensor_type (with the lag-
+                             compensated estimate for calibrated nodes),
+                             auto-reconnects
     useSessions.ts            GET /sessions
-    useSessionReadings.ts      GET /sessions/{id}/readings
+    useSessionReadings.ts      GET /sessions/{id}/readings, paged (the
+                               collector returns 5000 rows per request)
   pages/
     LiveView.tsx              grid of SensorPanel, one per sensor_type
     PlaybackView.tsx          session picker + ThresholdLineChart per

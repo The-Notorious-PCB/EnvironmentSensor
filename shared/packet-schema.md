@@ -11,7 +11,7 @@ implements, not a duplicate of it.
 One NDJSON line, one sensor reading:
 
 ```json
-{"node_id": "helmet-01", "sensor_type": "co2", "value": 812.4, "unit": "ppm", "timestamp": "2026-09-17T14:03:21.482Z", "seq": 10432, "crc16": "3af1"}
+{"node_id": "helmet-01", "sensor_type": "co2", "value": 812.4, "unit": "ppm", "timestamp": "2026-09-17T14:03:21.482Z", "seq": 10432, "crc16": "9ca5"}
 ```
 
 | Field | Type | Notes |
@@ -22,7 +22,7 @@ One NDJSON line, one sensor reading:
 | `unit` | string | always explicit — never inferred from `sensor_type` (e.g. `degC`, `kPa`, `%RH`, `ppm`) |
 | `timestamp` | string, ISO 8601 UTC | set by the relay box, not the sensor node |
 | `seq` | integer, 0–4294967295 | monotonic **per `node_id`**, assigned by the relay box |
-| `crc16` | string, 4 lowercase hex chars | CRC-16/CCITT-FALSE over the compact-JSON, sorted-key encoding of every other field, checked by the collector on ingest — see `firmware/README.md` for the exact algorithm and encoding, provisional pending firmware review |
+| `crc16` | string, 4 lowercase hex chars | CRC-16/CCITT-FALSE over the compact-JSON, sorted-key encoding of every other field, checked by the collector on ingest — see `firmware/README.md` for the exact algorithm, encoding and number-formatting pitfall |
 
 ### `sensor_type` enum
 

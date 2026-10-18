@@ -1,49 +1,53 @@
 # firmware
 
-ESP32/Teensy relay box firmware. Out of scope for this codebase's Python/JS
-work — this directory is a placeholder so the contract with `collector/` is
-documented up front.
+What relay box firmware must do to feed the collector. The firmware itself
+doesn't live here: the working breadboard implementation (two Seeed XIAO
+ESP32C6 boards: sensors -> BLE -> relay) is the separate
+[BreadBoardTest](https://github.com/The-Notorious-PCB/BreadBoardTest) repo,
+and is the reference for the real suit firmware.
 
 ## Responsibilities
 
-- Read suit sensor nodes over I2C/UART.
-- Emit one NDJSON packet per line over USB serial, per sensor reading (not
-  batched).
-- Mirror every emitted packet to the SD card as a local backup log.
-- Stamp `timestamp` itself (sensor nodes are not assumed to have wall-clock
-  time).
-- Maintain a monotonic per-node `seq` counter.
-- Compute `crc16` over the packet before emitting it.
+- Read the suit's sensor nodes.
+- Emit one NDJSON packet per line over USB serial, one per sensor reading
+  (not batched), so a corrupt line costs one reading, not a session.
+- Mirror every emitted packet to an SD card as a local backup log (not yet
+  done on the breadboard rig).
+- Stamp `timestamp` itself. The relay box has no clock: the collector writes
+  `T<unix epoch ms>\n` to the serial port on connect and every 10 s
+  (`collector/app/serial/reader.py`). The breadboard relay also treats 30 s
+  without one as "nobody is listening" and stops writing.
+- Keep `seq` monotonic per `node_id`, including across reboots (below).
+- Compute `crc16` over each packet.
 
-## Packet format it must emit
+## Packet format
 
-See [`../shared/packet-schema.md`](../shared/packet-schema.md) (human-readable
-spec) and [`../shared/packet-schema.json`](../shared/packet-schema.json)
-(machine-readable) for the authoritative schema. One example line:
+Authoritative schema: [`../shared/packet-schema.md`](../shared/packet-schema.md)
+(and [`packet-schema.json`](../shared/packet-schema.json)). Example:
 
 ```json
-{"node_id": "helmet-01", "sensor_type": "co2", "value": 812.4, "unit": "ppm", "timestamp": "2026-09-17T14:03:21.482Z", "seq": 10432, "crc16": "3af1"}
+{"node_id": "helmet-01", "sensor_type": "co2", "value": 812.4, "unit": "ppm", "timestamp": "2026-09-17T14:03:21.482Z", "seq": 10432, "crc16": "9ca5"}
 ```
 
-Rules:
-
-- One JSON object per line (NDJSON), newline-terminated.
+- One JSON object per line, newline-terminated.
 - `node_id`: `<location>-<index>`, lowercase-hyphenated.
-- `sensor_type`: lowercase snake_case, from the enum in the shared schema.
-- `unit`: always present, explicit — the collector does not infer units from
-  `sensor_type`.
+- `sensor_type`: from [`../shared/sensor-types.json`](../shared/sensor-types.json).
+- `unit`: always present; the collector never infers it.
 - `timestamp`: ISO 8601 UTC.
-- `seq`: uint32, monotonic per `node_id`, wraps rather than resets, so the
-  collector can detect drops.
-- `crc16`: CRC-16/CCITT-FALSE (poly `0x1021`, init `0xFFFF`), computed over
-  the compact-JSON, sorted-key encoding of every field except `crc16`
-  itself — e.g. Python's `json.dumps(fields, sort_keys=True,
-  separators=(",", ":"))`, UTF-8 encoded. See `collector/app/serial/parser.py`
-  (`compute_crc16`/`canonical_payload`) for the reference implementation;
-  the firmware side needs to reproduce that exact encoding byte-for-byte.
-  This is the collector-side placeholder for what should really be settled
-  with whoever builds the firmware — flag it for review before relying on
-  it.
+- `seq`: uint32 per `node_id`, wrapping rather than resetting. It must not
+  repeat within a collector session: rows are unique on
+  `(session_id, node_id, seq)`, so a repeat is silently dropped as a
+  duplicate. A relay that reboots mid-session has to carry on from where it
+  was (the breadboard relay reserves `seq` blocks in flash).
+- `crc16`: CRC-16/CCITT-FALSE (poly `0x1021`, init `0xFFFF`) over the
+  compact, sorted-key JSON of every other field, i.e. Python's
+  `json.dumps(fields, sort_keys=True, separators=(",", ":"))`. Reference:
+  `compute_crc16`/`canonical_payload` in `collector/app/serial/parser.py`.
 
-A corrupt/partial line should cost the collector exactly one reading, not the
-session — do not batch multiple readings into one line.
+**The CRC pitfall:** the collector parses the line and re-serializes it with
+Python before checking the CRC, so numbers must be written exactly as Python
+would write them back. `22.50` comes back as `22.5`, and `-0.00` as `0`:
+either would fail the check. Format with fixed decimals, then strip trailing
+zeros and a trailing `.`. BreadBoardTest's `include/ndjson.h` does this and
+its native tests check the output byte-for-byte against the collector's
+reference values.

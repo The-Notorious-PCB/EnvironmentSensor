@@ -13,6 +13,8 @@ app/
   main.py       FastAPI app factory, wires everything together in lifespan
   serial/       pyserial reader (background thread) + NDJSON/CRC parsing —
                 validates against shared/packet-schema.json
+                Also writes `T<unix ms>` to the port on connect and every
+                10 s: the relay box has no clock and stamps from this.
   models/       SQLModel table + packet schema definitions (source of
                 truth: SQLite)
   api/          FastAPI routes — REST (sessions/readings/health) + the
@@ -24,6 +26,9 @@ tests/
 
 Run it: `uvicorn app.main:app --reload` from this directory (needs a real
 serial port at `COLLECTOR_SERIAL_PORT`, or see below to run without one).
+For a recording session, [`../scripts/record.py`](../scripts/record.py)
+starts this, starts and stops the session, and loads the device's settings
+for you (see the root [README](../README.md)).
 
 Env vars (see `app/config.py`): `COLLECTOR_SERIAL_PORT`,
 `COLLECTOR_SERIAL_BAUDRATE`, `COLLECTOR_DATABASE_URL`,

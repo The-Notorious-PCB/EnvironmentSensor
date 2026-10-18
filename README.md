@@ -1,5 +1,31 @@
 # EnvironmentSensor
 
+Environmental monitoring for an analog-astronaut spacesuit (Colorado Space
+Grant Consortium capstone). Sensors inside the suit measure CO2,
+temperature, humidity and pressure (O2 and particulates planned); readings
+are logged durably on a laptop, shown live on a local dashboard and a public
+website, and published through Supabase for the digital-twin team.
+
+```
+sensor nodes -> relay box --USB serial--> collector (laptop) --> Supabase --> website
+                                            |-> SQLite (source of truth)
+                                            '-> dashboard (live, local)
+```
+
+| Folder | What it is |
+|---|---|
+| [`collector/`](collector) | Laptop service: reads the relay box, stores to SQLite, syncs to Supabase, serves the dashboard |
+| [`dashboard/`](dashboard) | Laptop UI: live view and session playback, talks only to the collector |
+| [`website/`](website) | Public site on GitHub Pages: register devices, live view, history, talks only to Supabase |
+| [`shared-ui/`](shared-ui) | Charts, alert thresholds and lag estimates used by both UIs |
+| [`shared/`](shared) | The data contract: packet schema, sensor types, device registration |
+| [`supabase/`](supabase) | Database migrations |
+| [`scripts/`](scripts) | `record.py` (record a session in one command), `simulate_device.py` (fake data for the website) |
+| [`firmware/`](firmware) | What relay box firmware must do; the working breadboard version is the separate [BreadBoardTest](https://github.com/The-Notorious-PCB/BreadBoardTest) repo |
+
+Design rationale and conventions: [`CLAUDE.md`](CLAUDE.md). Milestones:
+[`PLAN.md`](PLAN.md).
+
 ## Registering a device and recording a session
 
 Same steps for any relay box (the real suit device or a bench rig). The
@@ -126,14 +152,17 @@ To calibrate:
    a clear change (a breath test works for CO2 and humidity; for
    temperature, moving between two steady rooms is cleaner), then 10+ min
    of steady air.
-2. Fit and save, per sensor, from `BreadBoardTest/`:
+2. Fit and save, per sensor, from the
+   [BreadBoardTest](https://github.com/The-Notorious-PCB/BreadBoardTest)
+   repo, cloned next to this one (its tools read this repo's
+   `website/.env.local` and write `lag-params.json` here):
    ```
    python3 tools/lag_response.py --sensor co2 --session <id> --save-params
    python3 tools/lag_response.py --sensor humidity --session <id> --save-params
    python3 tools/lag_response.py --sensor temperature --session <id> --save-params
    ```
-   Check the charts it writes to `BreadBoardTest/analysis/` before trusting
-   the numbers.
+   Check the charts it writes to its `analysis/` folder before trusting the
+   numbers.
 3. Validate on a second test: e.g. `--tau <saved tau>` should still settle
    quickly without a big overshoot.
 4. Commit `lag-params.json`; pushing it redeploys the website.
