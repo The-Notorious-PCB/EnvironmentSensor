@@ -3,6 +3,9 @@ import type { MinimalReading, SensorType } from "../types";
 export interface SeriesPoint {
   timestamp: string;
   value: number;
+  /** Lag-compensated estimate of the true level, when the node has
+   * calibration (see lib/lagEstimate.ts). */
+  estimate?: number;
 }
 
 export type SeriesByNode = Record<string, SeriesPoint[]>;

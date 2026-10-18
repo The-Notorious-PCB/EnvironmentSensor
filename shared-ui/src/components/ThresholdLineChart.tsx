@@ -41,16 +41,24 @@ export interface ThresholdLineChartProps {
  * sensor's whole display range, so small changes are visible; the bands are
  * clipped to whatever range is showing.
  *
+ * Points carrying an `estimate` (lib/lagEstimate.ts) get a second, dashed
+ * line in the node's colour: the lag-compensated estimate of the true level.
+ *
  * Consuming apps must define the CSS custom properties `--chart-grid` and
  * `--chart-axis` (see shared-ui/README.md).
  */
 export function ThresholdLineChart({ sensorType, seriesByNode, height = 200 }: ThresholdLineChartProps) {
   const threshold = THRESHOLDS[sensorType];
   const nodeIds = Object.keys(seriesByNode);
+  const hasEstimate = nodeIds.some((id) => seriesByNode[id].some((p) => p.estimate !== undefined));
   const axis = useMemo(
     () =>
       fitAxis(
-        nodeIds.flatMap((id) => seriesByNode[id].map((point) => point.value)),
+        nodeIds.flatMap((id) =>
+          seriesByNode[id].flatMap((point) =>
+            point.estimate === undefined ? [point.value] : [point.value, point.estimate],
+          ),
+        ),
         threshold.minSpan,
         [threshold.min, threshold.max],
       ),
@@ -82,7 +90,10 @@ export function ThresholdLineChart({ sensorType, seriesByNode, height = 200 }: T
           // The tooltip box is always white, but its label inherits the page's
           // text color, which is near-white on the dark theme.
           labelStyle={{ color: "#000" }}
-          formatter={(value: number) => [`${value} ${threshold.unit}`, sensorType]}
+          formatter={(value: number, name: string) => [
+            `${Number(value.toFixed(2))} ${threshold.unit}`,
+            name,
+          ]}
         />
         <ReferenceArea ifOverflow="hidden" y1={threshold.min} y2={threshold.warnRange[0]} fill="#ef4444" fillOpacity={0.08} />
         <ReferenceArea
@@ -112,7 +123,21 @@ export function ThresholdLineChart({ sensorType, seriesByNode, height = 200 }: T
             isAnimationActive={false}
           />
         ))}
-        {nodeIds.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
+        {nodeIds
+          .filter((nodeId) => seriesByNode[nodeId].some((p) => p.estimate !== undefined))
+          .map((nodeId) => (
+            <Line
+              key={`${nodeId}-estimate`}
+              data={seriesByNode[nodeId]}
+              dataKey="estimate"
+              name={`${nodeId} (estimated)`}
+              stroke={NODE_COLORS[nodeIds.indexOf(nodeId) % NODE_COLORS.length]}
+              strokeDasharray="6 4"
+              dot={false}
+              isAnimationActive={false}
+            />
+          ))}
+        {(nodeIds.length > 1 || hasEstimate) && <Legend wrapperStyle={{ fontSize: 12 }} />}
       </LineChart>
     </ResponsiveContainer>
   );

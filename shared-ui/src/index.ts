@@ -8,6 +8,8 @@ export { groupBySensorAndNode } from "./lib/groupReadings";
 export type { SeriesPoint, SeriesByNode } from "./lib/groupReadings";
 
 export { fitAxis } from "./lib/axisDomain";
+export { LagEstimator, LiveEstimates, lagParamsFor, withEstimates } from "./lib/lagEstimate";
+export type { LagParams, OneTauParams, TwoTauParams } from "./lib/lagEstimate";
 export type { AxisFit } from "./lib/axisDomain";
 
 export type { SensorType, MinimalReading } from "./types";

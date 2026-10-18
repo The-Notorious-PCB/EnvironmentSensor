@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { groupBySensorAndNode, SENSOR_TYPES, THRESHOLDS, ThresholdLineChart } from "shared-ui";
+import { groupBySensorAndNode, SENSOR_TYPES, THRESHOLDS, ThresholdLineChart, withEstimates } from "shared-ui";
 import { useDevices } from "../hooks/useDevices";
 import { useDeviceSessions } from "../hooks/useDeviceSessions";
 import { useSessionReadings } from "../hooks/useSessionReadings";
@@ -15,7 +15,7 @@ export function HistoryPage() {
     selectedSessionId,
   );
 
-  const grouped = useMemo(() => groupBySensorAndNode(readings), [readings]);
+  const grouped = useMemo(() => withEstimates(groupBySensorAndNode(readings)), [readings]);
   const sensorsWithData = SENSOR_TYPES.filter((sensorType) => grouped[sensorType]);
 
   if (!deviceId) {

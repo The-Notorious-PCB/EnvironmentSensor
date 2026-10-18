@@ -1,0 +1,33 @@
+{
+  "bench-01": {
+    "co2": {
+      "calibrated_from": "0645c07f",
+      "calibrated_on": "2026-10-18",
+      "max": null,
+      "min": 400,
+      "model": "one_tau",
+      "tau": 147.0,
+      "window": 6
+    },
+    "humidity": {
+      "calibrated_from": "0645c07f",
+      "calibrated_on": "2026-10-18",
+      "max": 100,
+      "min": 0,
+      "model": "one_tau",
+      "tau": 12.6,
+      "window": 4
+    },
+    "temperature": {
+      "calibrated_from": "0645c07f",
+      "calibrated_on": "2026-10-18",
+      "fast_share": 0.22,
+      "max": null,
+      "min": null,
+      "model": "two_tau",
+      "tau1": 2,
+      "tau2": 220.0,
+      "window": 15
+    }
+  }
+}

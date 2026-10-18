@@ -13,9 +13,15 @@ src/
                          groupBySensorAndNode/charts need — deliberately not
                          tied to either app's full reading row type)
   config/thresholds.ts   single source of truth for alert-coloring ranges
+  config/lag-params.json per-node lag calibration for the estimated line
+                         (written by BreadBoardTest/tools/lag_response.py
+                         --save-params; see ../README.md)
   lib/
     thresholdStatus.ts    value -> ok/warn/danger
     groupReadings.ts       flat readings -> sensor_type -> node_id series
+    axisDomain.ts          y-axis fitted to the data
+    lagEstimate.ts         lag-compensated estimates: LiveEstimates for
+                           live streams, withEstimates for whole sessions
   components/
     ThresholdLineChart.tsx  line chart with threshold bands
     SensorGauge.tsx          current-value gauge, colored by threshold

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { groupBySensorAndNode, SENSOR_TYPES, THRESHOLDS, ThresholdLineChart } from "shared-ui";
+import { groupBySensorAndNode, SENSOR_TYPES, THRESHOLDS, ThresholdLineChart, withEstimates } from "shared-ui";
 import { useSessionReadings } from "../hooks/useSessionReadings";
 import { useSessions } from "../hooks/useSessions";
 
@@ -14,7 +14,7 @@ export function PlaybackView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { readings, loading: readingsLoading, error: readingsError } = useSessionReadings(selectedId);
 
-  const grouped = useMemo(() => groupBySensorAndNode(readings), [readings]);
+  const grouped = useMemo(() => withEstimates(groupBySensorAndNode(readings)), [readings]);
   const sensorsWithData = SENSOR_TYPES.filter((sensorType) => grouped[sensorType]);
 
   return (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { LiveEstimates } from "shared-ui";
 import type { SeriesByNode, SensorType } from "shared-ui";
 import { supabase } from "../lib/supabaseClient";
 import type { ReadingRow } from "../types";
@@ -38,6 +39,10 @@ export function useDeviceRealtime(deviceId: string | undefined): UseDeviceRealti
 
     if (!deviceId) return;
 
+    // Estimator state lives for the whole subscription, not the 60-point
+    // chart buffer: the slow temperature model needs minutes of history.
+    const estimates = new LiveEstimates();
+
     const channel = supabase
       .channel(`readings-device-${deviceId}`)
       .on(
@@ -50,14 +55,12 @@ export function useDeviceRealtime(deviceId: string | undefined): UseDeviceRealti
         },
         (payload) => {
           const reading = payload.new as ReadingRow;
+          const point = estimates.point(reading);
           setLatest((prev) => ({ ...prev, [reading.sensor_type]: reading }));
           setHistory((prev) => {
             const bySensor = prev[reading.sensor_type] ?? {};
             const nodeSeries = bySensor[reading.node_id] ?? [];
-            const updated = [
-              ...nodeSeries,
-              { timestamp: reading.timestamp, value: reading.value },
-            ].slice(-HISTORY_LIMIT);
+            const updated = [...nodeSeries, point].slice(-HISTORY_LIMIT);
             return {
               ...prev,
               [reading.sensor_type]: { ...bySensor, [reading.node_id]: updated },

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { LiveEstimates } from "shared-ui";
 import type { SeriesByNode } from "shared-ui";
 import { liveWebSocketUrl } from "../lib/api";
 import type { LiveReading, SensorType } from "../types/reading";
@@ -28,6 +29,9 @@ export function useLiveReadings(): UseLiveReadings {
     cancelledRef.current = false;
     let socket: WebSocket | undefined;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    // Estimator state lives for the whole session (across reconnects), not
+    // the 60-point chart buffer: the slow temperature model needs minutes.
+    const estimates = new LiveEstimates();
 
     function connect() {
       socket = new WebSocket(liveWebSocketUrl());
@@ -53,15 +57,13 @@ export function useLiveReadings(): UseLiveReadings {
         } catch {
           return; // malformed message — drop it, don't crash the feed
         }
+        const point = estimates.point(reading);
 
         setLatest((prev) => ({ ...prev, [reading.sensor_type]: reading }));
         setHistory((prev) => {
           const bySensor = prev[reading.sensor_type] ?? {};
           const nodeSeries = bySensor[reading.node_id] ?? [];
-          const updated = [
-            ...nodeSeries,
-            { timestamp: reading.timestamp, value: reading.value },
-          ].slice(-HISTORY_LIMIT);
+          const updated = [...nodeSeries, point].slice(-HISTORY_LIMIT);
           return {
             ...prev,
             [reading.sensor_type]: { ...bySensor, [reading.node_id]: updated },
