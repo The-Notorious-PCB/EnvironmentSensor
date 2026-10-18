@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_RECONNECT_DELAY_SECONDS = 2.0
 
+# The relay box has no wall clock, so it stamps packet timestamps from the
+# time we send it: "T<unix epoch ms>\n", on connect and then every interval.
+# Firmware that doesn't read serial input just ignores it. The relay also
+# treats a long silence as "nobody's listening" and stops writing (see
+# BreadBoardTest/src/receiver), so this doubles as a heartbeat.
+DEFAULT_TIME_SYNC_INTERVAL_SECONDS = 10.0
+
 
 class SerialReader:
     """Reads NDJSON lines from the relay box over serial in a background
@@ -35,6 +42,7 @@ class SerialReader:
         queue: "asyncio.Queue",
         serial_factory: Callable[..., object] = pyserial.Serial,
         reconnect_delay: float = DEFAULT_RECONNECT_DELAY_SECONDS,
+        time_sync_interval: float = DEFAULT_TIME_SYNC_INTERVAL_SECONDS,
     ) -> None:
         self._port = port
         self._baudrate = baudrate
@@ -42,6 +50,7 @@ class SerialReader:
         self._queue = queue
         self._serial_factory = serial_factory
         self._reconnect_delay = reconnect_delay
+        self._time_sync_interval = time_sync_interval
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self.stats: Counter = Counter()
@@ -79,8 +88,17 @@ class SerialReader:
             if not self._stop_event.is_set():
                 self._stop_event.wait(self._reconnect_delay)
 
+    def _send_time_sync(self, conn) -> None:
+        conn.write(f"T{int(time.time() * 1000)}\n".encode("ascii"))
+        self.stats["time_syncs"] += 1
+
     def _read_loop(self, conn) -> None:
+        next_time_sync = 0.0
         while not self._stop_event.is_set():
+            # readline() times out after 1 s, so this runs at least that often.
+            if time.monotonic() >= next_time_sync:
+                self._send_time_sync(conn)
+                next_time_sync = time.monotonic() + self._time_sync_interval
             raw = conn.readline()
             if not raw:
                 time.sleep(0.01)

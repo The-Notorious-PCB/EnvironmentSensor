@@ -81,7 +81,9 @@ def get_session_readings(
     statement = (
         select(Reading)
         .where(Reading.session_id == session_id)
-        .order_by(Reading.timestamp)
+        # id breaks timestamp ties (every sensor in a packet shares one), so
+        # paging with offset never skips or repeats a row at a page boundary.
+        .order_by(Reading.timestamp, Reading.id)
         .offset(offset)
         .limit(limit)
     )

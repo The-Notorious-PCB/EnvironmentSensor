@@ -1,4 +1,5 @@
 import asyncio
+import re
 import time
 
 from app.serial.reader import SerialReader
@@ -90,3 +91,31 @@ def test_reader_reconnects_after_disconnect():
     assert reader.stats["reconnects"] >= 1
     assert first_fake.closed
     assert second_fake.closed
+
+
+def test_reader_sends_time_sync_on_connect_and_periodically():
+    fake = FakeSerial([])
+    loop = asyncio.new_event_loop()
+
+    reader = SerialReader(
+        port="ignored",
+        baudrate=115200,
+        loop=loop,
+        queue=asyncio.Queue(),
+        serial_factory=lambda *a, **kw: fake,
+        time_sync_interval=0.05,
+    )
+
+    before_ms = int(time.time() * 1000)
+    reader.start()
+    time.sleep(0.3)
+    reader.stop()
+    after_ms = int(time.time() * 1000)
+    loop.close()
+
+    assert len(fake.written) >= 2
+    for line in fake.written:
+        match = re.fullmatch(rb"T(\d+)\n", line)
+        assert match, line
+        assert before_ms <= int(match.group(1)) <= after_ms
+    assert reader.stats["time_syncs"] == len(fake.written)

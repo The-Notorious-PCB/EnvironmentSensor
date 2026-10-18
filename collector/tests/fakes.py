@@ -6,13 +6,19 @@ from serial import SerialException
 class FakeSerial:
     """Duck-types pyserial's Serial for tests: readline() returns queued
     byte lines one at a time, then b"" forever after (like a real port with
-    a read timeout and nothing more incoming). close() just flips a flag so
-    tests can assert the reader cleaned up after itself.
+    a read timeout and nothing more incoming). write() records what the
+    reader sent the relay box. close() just flips a flag so tests can assert
+    the reader cleaned up after itself.
     """
 
     def __init__(self, lines):
         self._lines = list(lines)
         self.closed = False
+        self.written: list[bytes] = []
+
+    def write(self, data: bytes) -> int:
+        self.written.append(data)
+        return len(data)
 
     def readline(self) -> bytes:
         if self._lines:
