@@ -66,16 +66,34 @@ in this sequence):
    and the owner-scoped RLS policies from migration 2, replaces them with
    fully-public ones, and makes `register_device` callable by anyone (no
    `auth.uid()` check). See `shared/device-registration.md`'s "No login".
+5. [`20260925010000_fix_pgcrypto_search_path.sql`](migrations/20260925010000_fix_pgcrypto_search_path.sql)
+   — fixes `register_device`/`verify_device_api_key` failing with
+   `function gen_random_bytes(integer) does not exist` on a real Supabase
+   project. Supabase installs `pgcrypto` into an `extensions` schema, not
+   `public`; both functions declared `set search_path = public` only, so
+   pgcrypto's functions were never resolvable. Adds `extensions` to their
+   search_path.
 
-All four verified by hand against a local Postgres 16 instance, applied
-in order **from a completely empty database** (register a device with no
+All five verified by hand against a local Postgres 16 instance, applied in
+order **from a completely empty database** (register a device with no
 login, ingest with correct/wrong/deactivated keys, confirm `owner_id` is
 actually gone, public read/update access, `device_sessions` aggregation,
 Realtime publication, `device_id` FK enforcement, `api_key_hash` still
 never selectable even with public access) — not just checked for SQL
-syntax. Each migration was caught failing at least once during this
-verification before being fixed (a missing base table, a REVOKE
-referencing an already-dropped column) — "from a completely empty
+syntax. Each of the first four migrations was caught failing at least once
+during this verification before being fixed (a missing base table, a
+REVOKE referencing an already-dropped column) — "from a completely empty
 database" specifically is what surfaces these, since a database that
 already has leftover state from manual testing can mask a migration
 depending on something no migration actually creates.
+
+Migration 5 is the one bug that verification *didn't* catch beforehand —
+it only reproduces on a database whose extension layout matches Supabase's
+actual convention (`pgcrypto` pre-installed into `extensions`, not
+`public`), which plain local Postgres doesn't do by default. Caught after
+the fact from a real `register_device` call failing on the live project,
+then reproduced locally by explicitly replicating that schema layout
+before confirming the fix. Worth remembering for any future function here
+that touches `pgcrypto`: `local Postgres 16` verification alone isn't
+sufficient proof against Supabase specifically — the schema layout has to be
+replicated too, not just the extension being installed somewhere.
