@@ -21,7 +21,7 @@ sensor nodes -> relay box --USB serial--> collector (laptop) --> Supabase --> we
 | [`shared/`](shared) | The data contract: packet schema, sensor types, device registration |
 | [`supabase/`](supabase) | Database migrations |
 | [`scripts/`](scripts) | `record.py` (record a session in one command), `simulate_device.py` (fake data for the website) |
-| [`firmware/`](firmware) | What relay box firmware must do; the working breadboard version is the separate [BreadBoardTest](https://github.com/The-Notorious-PCB/BreadBoardTest) repo |
+| [`firmware/`](firmware) | What relay box firmware must do; the working breadboard rigs (two-board BLE rig, and the ExplorIR-M CO2 rig) are in the separate [BreadBoardTest](https://github.com/The-Notorious-PCB/BreadBoardTest) repo |
 
 Design rationale and conventions: [`CLAUDE.md`](CLAUDE.md). Milestones:
 [`PLAN.md`](PLAN.md).
@@ -143,10 +143,19 @@ The estimate only appears for nodes that have calibration in
 [`shared-ui/src/config/lag-params.json`](shared-ui/src/config/lag-params.json),
 keyed by `node_id`. The numbers describe the whole setup (mounting,
 enclosure, airflow), not just the sensor chip, so **calibrate each setup**:
-the breadboard (`bench-01`) and the final PCB will differ, and so may fan on
-vs. off.
+the breadboard rigs (`bench-01`, two-board BLE rig; `explorir-01`,
+ExplorIR-M rig) and the final PCB will differ, and so may fan on vs. off.
 
-To calibrate:
+**Quickest, with the relay box plugged into this laptop:** BreadBoardTest's
+`tools/calibrate_lag.py` runs the test live, guides you through it, and fits
+and saves straight from the serial port, no recorded session needed (see
+BreadBoardTest's README, "Calibrate its lag"):
+
+```
+python3 tools/calibrate_lag.py --co2 --humidity    # breath test; or --temperature
+```
+
+**From a recorded session instead:**
 
 1. Record a session on the final hardware, mounted as it will be used:
    a clear change (a breath test works for CO2 and humidity; for

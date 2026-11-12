@@ -1,10 +1,14 @@
 # firmware
 
 What relay box firmware must do to feed the collector. The firmware itself
-doesn't live here: the working breadboard implementation (two Seeed XIAO
-ESP32C6 boards: sensors -> BLE -> relay) is the separate
-[BreadBoardTest](https://github.com/The-Notorious-PCB/BreadBoardTest) repo,
-and is the reference for the real suit firmware.
+doesn't live here: the working breadboard implementations are in the
+separate [BreadBoardTest](https://github.com/The-Notorious-PCB/BreadBoardTest)
+repo, and are the reference for the real suit firmware:
+
+- `env:sensor_node` + `env:receiver`: two Seeed XIAO ESP32C6 boards,
+  BME688 + SCD41 -> BLE -> relay (`bench-01`).
+- `env:explorir`: one XIAO reading an ExplorIR-M CO2 sensor (UART) and a
+  BME on I2C, pressure-correcting the CO2 itself (`explorir-01`).
 
 ## Responsibilities
 
@@ -13,6 +17,11 @@ and is the reference for the real suit firmware.
   (not batched), so a corrupt line costs one reading, not a session.
 - Mirror every emitted packet to an SD card as a local backup log (not yet
   done on the breadboard rig).
+- Send values already corrected for anything the collector can't know: the
+  collector stores what it's sent. NDIR CO2 sensors read low below
+  sea-level pressure (~23% at 840 mbar), so correct CO2 for ambient
+  pressure, ideally live from a barometer next to it. The ExplorIR rig does
+  this with a BME; the SCD41 rig feeds the BME688's pressure to the SCD41.
 - Stamp `timestamp` itself. The relay box has no clock: the collector writes
   `T<unix epoch ms>\n` to the serial port on connect and every 10 s
   (`collector/app/serial/reader.py`). The breadboard relay also treats 30 s

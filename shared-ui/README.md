@@ -15,7 +15,7 @@ src/
   config/thresholds.ts   single source of truth for alert-coloring ranges
   config/lag-params.json per-node lag calibration for the estimated line
                          (written by BreadBoardTest/tools/lag_response.py
-                         --save-params; see ../README.md)
+                         or calibrate_lag.py --save-params; see ../README.md)
   lib/
     thresholdStatus.ts    value -> ok/warn/danger
     groupReadings.ts       flat readings -> sensor_type -> node_id series

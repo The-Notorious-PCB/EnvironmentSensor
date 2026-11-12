@@ -92,8 +92,8 @@ means a corrupt/partial line only costs one reading, not a whole batch.
 
 ```
 firmware/          contract for relay box firmware (see firmware/README.md);
-                    the breadboard implementation is the separate
-                    BreadBoardTest repo
+                    the breadboard implementations (two-board BLE rig,
+                    ExplorIR-M CO2 rig) are the separate BreadBoardTest repo
 collector/          Python + FastAPI service (see collector/README.md)
   app/
     serial/        pyserial reader, NDJSON parsing + CRC validation
