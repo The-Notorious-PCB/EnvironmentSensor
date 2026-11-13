@@ -4,13 +4,25 @@ import { groupBySensorAndNode, SENSOR_TYPES, THRESHOLDS, ThresholdLineChart, wit
 import { useDevices } from "../hooks/useDevices";
 import { useDeviceSessions } from "../hooks/useDeviceSessions";
 import { useSessionReadings } from "../hooks/useSessionReadings";
+import { downloadCsv, readingsToCsv, sessionCsvFilename } from "../lib/csv";
 import { formatSessionLabel } from "../lib/format";
+
+// A session whose last reading is this recent may still be recording.
+const STILL_RECORDING_MS = 2 * 60 * 1000;
 
 export function HistoryPage() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const { devices, loading: devicesLoading } = useDevices();
-  const { sessions, loading: sessionsLoading, error: sessionsError } = useDeviceSessions(deviceId);
+  const {
+    sessions,
+    loading: sessionsLoading,
+    error: sessionsError,
+    deleteSession,
+  } = useDeviceSessions(deviceId);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
   const { readings, loading: readingsLoading, error: readingsError } = useSessionReadings(
     selectedSessionId,
   );
@@ -42,6 +54,51 @@ export function HistoryPage() {
   }
 
   const device = devices.find((d) => d.id === deviceId);
+  const selectedSession = sessions.find((s) => s.session_id === selectedSessionId);
+  // Readings can briefly belong to the previously selected session while
+  // the new one loads; only offer the CSV once they match.
+  const readingsReady =
+    !readingsLoading && readings.length > 0 && readings[0].session_id === selectedSessionId;
+
+  function selectSession(sessionId: string | null) {
+    setSelectedSessionId(sessionId);
+    setDeleteError(null);
+    setDeleteNotice(null);
+  }
+
+  function handleDownloadCsv() {
+    if (!selectedSession || !readingsReady) return;
+    downloadCsv(sessionCsvFilename(device?.name, selectedSession.start_time), readingsToCsv(readings));
+  }
+
+  async function handleDelete() {
+    if (!selectedSession) return;
+    const label = formatSessionLabel(selectedSession);
+    const mayBeRecording = Date.now() - new Date(selectedSession.end_time).getTime() < STILL_RECORDING_MS;
+    const message =
+      `Delete this session${device ? ` of ${device.name}` : ""}?\n\n${label}\n\n` +
+      "This permanently removes its readings from the cloud database for everyone, " +
+      "including the digital-twin team. It can't be undone. " +
+      "(The laptop collector's own copy is not affected.)" +
+      (mayBeRecording
+        ? "\n\nIts last reading is under 2 minutes old, so it may still be recording: " +
+          "readings that arrive after the delete will show up again as this session."
+        : "");
+    if (!window.confirm(message)) return;
+
+    setDeleting(true);
+    setDeleteError(null);
+    setDeleteNotice(null);
+    try {
+      const deleted = await deleteSession(selectedSession.session_id);
+      setSelectedSessionId(null);
+      setDeleteNotice(`Deleted the session from ${new Date(selectedSession.start_time).toLocaleString()} (${deleted} readings).`);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div>
@@ -59,7 +116,7 @@ export function HistoryPage() {
           <select
             id="session-select"
             value={selectedSessionId ?? ""}
-            onChange={(event) => setSelectedSessionId(event.target.value || null)}
+            onChange={(event) => selectSession(event.target.value || null)}
           >
             <option value="">Select a session…</option>
             {sessions.map((session) => (
@@ -68,9 +125,32 @@ export function HistoryPage() {
               </option>
             ))}
           </select>
+          {selectedSession && (
+            <>
+              <button
+                type="button"
+                className="button"
+                onClick={handleDownloadCsv}
+                disabled={!readingsReady || deleting}
+                title="Every raw reading of this session, one row per reading"
+              >
+                Download CSV
+              </button>
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting…" : "Delete session"}
+              </button>
+            </>
+          )}
         </div>
       )}
 
+      {deleteNotice && <p className="notice">{deleteNotice}</p>}
+      {deleteError && <p className="error">Could not delete the session: {deleteError}</p>}
       {selectedSessionId && readingsLoading && <p>Loading readings…</p>}
       {readingsError && <p className="error">Could not load readings: {readingsError}</p>}
 

@@ -16,7 +16,9 @@ and
 
 The website has no accounts, no sign-up/log-in pages, nothing gating
 access. Anyone with the site URL can see every registered device and its
-readings, register a new device, or rename/deactivate any existing one.
+readings, register a new device, rename/deactivate any existing one, or
+delete any recorded session (History page, behind a confirmation — see
+"Security notes").
 
 This is a deliberate simplification, not an oversight: the original design
 had per-user accounts (`sensor_arrays.owner_id` → `auth.users`, RLS scoping
@@ -146,3 +148,13 @@ status is active."
   anyone can deactivate *any* device, not just their own (there's no
   "own" anymore) — an accepted tradeoff of the fully-public model, not an
   oversight.
+- Likewise anyone can permanently delete any session's readings, through
+  `delete_session(device_id, session_id)`
+  ([`20261113120000_delete_session.sql`](../supabase/migrations/20261113120000_delete_session.sql)),
+  which the website's History page calls after a confirmation dialog.
+  Unlike deactivation this can't be undone in Supabase; the collector's
+  SQLite copy is the only remaining record. It's an RPC rather than a
+  DELETE grant on `readings` so a caller can only remove one session of
+  one device per call, never arbitrary rows. If that ever needs
+  tightening, check the device's API key in it the way `ingest_readings`
+  does.

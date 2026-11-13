@@ -17,6 +17,8 @@ src/
   lib/
     supabaseClient.ts   createClient() from build-time env vars
     format.ts             pure display-formatting helpers (tested)
+    csv.ts                session readings -> CSV, file name, download
+                          (tested)
   types.ts               Supabase row shapes (sensor_arrays, readings,
                           the device_sessions view)
   hooks/
@@ -32,7 +34,10 @@ src/
                               key once
     DeviceListPage.tsx         every device, status, last_seen_at
     LiveViewPage.tsx            Realtime charts for one device
-    HistoryPage.tsx              session picker + charts for one device
+    HistoryPage.tsx              session picker + charts for one device;
+                                 download a session as CSV, delete a
+                                 session (delete_session RPC, after a
+                                 confirmation)
 tests/
 ```
 

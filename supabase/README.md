@@ -73,8 +73,19 @@ in this sequence):
    `public`; both functions declared `set search_path = public` only, so
    pgcrypto's functions were never resolvable. Adds `extensions` to their
    search_path.
+6. [`20261113120000_delete_session.sql`](migrations/20261113120000_delete_session.sql)
+   — `delete_session(device_id, session_id)`, open to anyone like the rest
+   of the site, which the website's History page calls (after a
+   confirmation) to permanently delete one session's readings. An RPC
+   rather than a DELETE grant so a call can't delete more than one
+   session. Verified from an empty database with all six migrations in
+   order, in PGlite (Postgres 16 in WASM) with Supabase's layout stubbed
+   in (`anon`/`authenticated` roles, `auth.users`, pgcrypto functions in
+   `extensions`): as `anon` it deletes only the matching device's session
+   and returns the count, and `anon` still has no direct DELETE on
+   `readings`.
 
-All five verified by hand against a local Postgres 16 instance, applied in
+The first five verified by hand against a local Postgres 16 instance, applied in
 order **from a completely empty database** (register a device with no
 login, ingest with correct/wrong/deactivated keys, confirm `owner_id` is
 actually gone, public read/update access, `device_sessions` aggregation,

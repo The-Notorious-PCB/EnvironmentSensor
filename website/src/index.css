@@ -110,6 +110,7 @@ body {
 .playback-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 16px;
 }
@@ -235,6 +236,25 @@ body {
   color: white;
   text-decoration: none;
   font-size: 0.9rem;
+}
+
+button.button {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+button.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.button-danger {
+  background: #dc2626;
+}
+
+.notice {
+  color: var(--text-muted);
 }
 
 .device-table {
