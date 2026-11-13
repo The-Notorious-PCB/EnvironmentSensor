@@ -135,3 +135,71 @@ local network involved.
 - Tests: `shared-ui` (pure logic), `website` (pure logic — `format.ts`);
   migration behavior verified by hand against local Postgres (RLS
   isolation, API-key auth, upsert idempotency), not just reviewed.
+
+## M10 — Per-device calibration profiles (planned, not started)
+
+Demo: calibrate a node with `calibrate_lag.py --save-params`, then open
+that device's live view on the website: the dashed "(estimated)" line uses
+the new calibration immediately, with no commit, push or redeploy. A second
+device with the same `node_id` keeps its own calibration.
+
+Why: lag calibrations (the time constants behind the estimated line, see the
+README's "Lag-compensated estimates") live in
+`shared-ui/src/config/lag-params.json`, keyed by `node_id` and built into
+both frontends. That works for one bench rig per node name, but not for the
+finished product with every node of every suit calibrated:
+
+- `node_id` is only unique within one relay box: two suits that both have a
+  `helmet-01` would share (overwrite) one calibration.
+- Each calibration is a code change: commit, push and redeploy, by someone
+  with repo access.
+- Saving again overwrites the old values; past sessions can't be shown with
+  the calibration that was valid at the time.
+- The digital-twin team can't read calibrations.
+
+Plan: a calibration becomes data attached to the registered device, stored
+in Supabase per (device, node, sensor), newest one active, history kept.
+
+- `supabase/migrations`: `device_calibrations` table — `device_id` (FK
+  `sensor_arrays`), `node_id`, `sensor_type`, `params jsonb` (the same shape
+  as today's `lag-params.json` entries: `model`, `tau` / `tau1` + `tau2` +
+  `fast_share`, `window`, `min`, `max`, `part`, ...), `calibrated_at`,
+  `calibrated_from`. Public read (same `using (true)` model as `readings`);
+  no direct insert — a `save_calibration(device_id, api_key, node_id,
+  sensor_type, params)` security-definer RPC that checks the device's API
+  key exactly like `ingest_readings`. A view (or query) for the newest
+  calibration per (device, node, sensor).
+- BreadBoardTest `tools/calibrate_lag.py`: `--save-params --device <name>`
+  uploads through that RPC using `collector/.env.<name>.local`
+  (`SUPABASE_URL`/`KEY`, `COLLECTOR_DEVICE_ID`/`API_KEY`), instead of
+  writing `lag-params.json`. Keep the saved run JSON so any run can be
+  replayed and uploaded later.
+- `shared-ui/src/lib/lagEstimate.ts`: take calibration as an input
+  (`LiveEstimates` / `withEstimates` given a params lookup) instead of
+  importing the JSON.
+- `website`: load the device's calibrations alongside the device (live and
+  history views); history could pick the calibration valid at the session's
+  time.
+- `collector`: fetch its own device's calibrations at startup, keep a local
+  copy (SQLite) so it works offline, serve them on a REST endpoint;
+  `dashboard` reads them from there.
+- Migrate the existing `bench-01` entry into the breadboard device's profile
+  (its `COLLECTOR_DEVICE_ID` is in `collector/.env.breadboard.local`), then
+  retire `lag-params.json`.
+- Tests: migration verified by hand against local Postgres from a completely
+  empty database, with `pgcrypto` in an `extensions` schema like Supabase
+  (see `supabase/README.md` — that layout difference caused the last
+  migration bug): public read, RPC with right/wrong/deactivated key, newest
+  wins. `shared-ui` estimator tests with injected params; collector tests
+  for the fetch + offline cache with a mocked Supabase client.
+- Deploy: the project owner applies the migration with `supabase db push`;
+  the website change ships with it. Tell the digital-twin team the table
+  exists (read-only for them, like `readings`).
+
+Until then: calibrations go in `lag-params.json` keyed by `node_id`
+(BreadBoardTest README, "Calibrate its lag"). A good CO2 run for
+`explorir-01` (τ ≈ 11.7 s, 2026-11-13) is saved only on the bench laptop as
+`BreadBoardTest/analysis/lagcal_explorir-01_20261113-114407.json`
+(`analysis/` is gitignored); replay it into the new profile once it exists.
+Its humidity half isn't usable (the sensor saturated near 87 %RH); redo
+humidity with a smaller breath.
