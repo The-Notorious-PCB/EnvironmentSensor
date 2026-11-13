@@ -42,6 +42,11 @@ define, in its own global CSS:
 - Custom properties `--chart-grid` and `--chart-axis` (used by
   `ThresholdLineChart`'s grid lines and axes, so they respect the app's own
   light/dark theme).
+- Optionally `--series-1` … `--series-8`, the line colors. Unset, they fall
+  back to the light-surface steps in `ThresholdLineChart.tsx`; both apps
+  set the dark-surface steps in their dark-theme block. Node *i*'s reading
+  uses slot 2*i*+1 and its estimate slot 2*i*+2 (one node: blue reading,
+  orange estimate).
 - Classes `.sensor-panel`, `.sensor-panel-empty`, `.sensor-gauge`,
   `.sensor-gauge-value`, `.sensor-gauge-unit`, `.sensor-gauge-status`.
 

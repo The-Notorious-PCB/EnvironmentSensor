@@ -1,12 +1,20 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { SENSOR_TYPES, SensorPanel } from "shared-ui";
+import { SENSOR_TYPES, SensorPanel, THRESHOLDS, ThresholdLineChart, type SensorType } from "shared-ui";
+import { ChartModal } from "../components/ChartModal";
+import { EstimateToggle } from "../components/EstimateToggle";
+import { ExpandablePanel } from "../components/ExpandablePanel";
 import { useDeviceRealtime } from "../hooks/useDeviceRealtime";
 import { useDevices } from "../hooks/useDevices";
+import { useShowEstimates } from "../hooks/useShowEstimates";
 
 export function LiveViewPage() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const { devices, loading: devicesLoading } = useDevices();
   const { latest, history, connected } = useDeviceRealtime(deviceId);
+  const [showEstimates, setShowEstimates] = useShowEstimates();
+  // Only the sensor type is kept, so the larger view keeps updating live.
+  const [expanded, setExpanded] = useState<SensorType | null>(null);
 
   if (!deviceId) {
     return (
@@ -42,20 +50,54 @@ export function LiveViewPage() {
         collector's own sync interval plus Supabase Realtime's replication
         lag.
       </p>
-      <div className="connection-status">
-        <span className={`status-dot ${connected ? "status-dot-ok" : "status-dot-down"}`} />
-        {connected ? "Subscribed" : "Connecting…"}
+      <div className="chart-options">
+        <div className="connection-status">
+          <span className={`status-dot ${connected ? "status-dot-ok" : "status-dot-down"}`} />
+          {connected ? "Subscribed" : "Connecting…"}
+        </div>
+        <EstimateToggle checked={showEstimates} onChange={setShowEstimates} />
       </div>
       <div className="sensor-grid">
         {SENSOR_TYPES.map((sensorType) => (
-          <SensorPanel
+          <ExpandablePanel
             key={sensorType}
-            sensorType={sensorType}
-            latest={latest[sensorType]}
-            seriesByNode={history[sensorType] ?? {}}
-          />
+            label={THRESHOLDS[sensorType].label}
+            onExpand={() => setExpanded(sensorType)}
+          >
+            <SensorPanel
+              sensorType={sensorType}
+              latest={latest[sensorType]}
+              seriesByNode={history[sensorType] ?? {}}
+              showEstimate={showEstimates}
+            />
+          </ExpandablePanel>
         ))}
       </div>
+
+      {expanded && (
+        <ChartModal
+          title={
+            <>
+              {THRESHOLDS[expanded].label}
+              {latest[expanded] && (
+                <span className="chart-modal-latest">
+                  {" "}
+                  {Number(latest[expanded]!.value.toFixed(2))} {latest[expanded]!.unit}
+                </span>
+              )}
+            </>
+          }
+          controls={<EstimateToggle checked={showEstimates} onChange={setShowEstimates} />}
+          onClose={() => setExpanded(null)}
+        >
+          <ThresholdLineChart
+            sensorType={expanded}
+            seriesByNode={history[expanded] ?? {}}
+            height="100%"
+            showEstimate={showEstimates}
+          />
+        </ChartModal>
+      )}
     </div>
   );
 }

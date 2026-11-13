@@ -27,8 +27,14 @@ src/
                               readings (the Live page)
     useDeviceSessions.ts       past sessions for a device (the History page)
     useSessionReadings.ts       readings for one selected session
+    useShowEstimates.ts         the estimate checkbox, remembered in
+                                this browser (localStorage)
   components/
     NavBar.tsx
+    EstimateToggle.tsx   "Show estimated line" checkbox (Live, History,
+                          and the larger view)
+    ExpandablePanel.tsx  makes a chart panel clickable to open...
+    ChartModal.tsx       ...its larger view, a native <dialog>
   pages/
     RegisterDevicePage.tsx    register a device (no login), show its API
                               key once

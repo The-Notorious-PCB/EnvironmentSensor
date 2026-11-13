@@ -19,6 +19,15 @@
     --chart-grid: #334155;
     --chart-axis: #94a3b8;
     --accent: #60a5fa;
+    /* Chart series, stepped for the dark surface (shared-ui ThresholdLineChart). */
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
   }
 }
 
@@ -371,4 +380,92 @@ button.button:disabled {
 
 .device-picker li {
   margin-bottom: 6px;
+}
+
+/* --- chart options and larger view --- */
+
+.chart-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.estimate-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.chart-options .connection-status {
+  margin-bottom: 0;
+}
+
+.expandable-panel {
+  cursor: zoom-in;
+  border-radius: 10px;
+  transition: box-shadow 0.15s;
+}
+
+.expandable-panel:hover,
+.expandable-panel:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+  outline: none;
+}
+
+.expandable-panel > .sensor-panel {
+  height: 100%;
+}
+
+.chart-modal {
+  width: min(1100px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.chart-modal::backdrop {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.chart-modal-content {
+  padding: 16px;
+}
+
+.chart-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.chart-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.chart-modal-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.chart-modal-body {
+  height: min(70vh, 640px);
+}
+
+.chart-modal-latest {
+  font-weight: 400;
+  color: var(--text-muted);
 }

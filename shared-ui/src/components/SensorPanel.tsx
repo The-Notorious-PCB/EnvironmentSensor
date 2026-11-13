@@ -11,6 +11,8 @@ export interface SensorPanelProps {
    * Realtime row, etc. all satisfy this as-is). */
   latest?: { value: number; unit: string };
   seriesByNode: SeriesByNode;
+  /** Passed to ThresholdLineChart: draw the estimate lines, if any. */
+  showEstimate?: boolean;
 }
 
 /** Live-view card for one sensor_type: current-value gauge (most recent
@@ -18,7 +20,7 @@ export interface SensorPanelProps {
  * nodes reporting this sensor. Used by both the laptop dashboard (fed from
  * the collector's WebSocket) and the website (fed from Supabase Realtime).
  */
-export function SensorPanel({ sensorType, latest, seriesByNode }: SensorPanelProps) {
+export function SensorPanel({ sensorType, latest, seriesByNode, showEstimate = true }: SensorPanelProps) {
   const label = THRESHOLDS[sensorType].label;
 
   return (
@@ -29,7 +31,12 @@ export function SensorPanel({ sensorType, latest, seriesByNode }: SensorPanelPro
       ) : (
         <div className="sensor-panel-empty">No data yet</div>
       )}
-      <ThresholdLineChart sensorType={sensorType} seriesByNode={seriesByNode} height={140} />
+      <ThresholdLineChart
+        sensorType={sensorType}
+        seriesByNode={seriesByNode}
+        height={140}
+        showEstimate={showEstimate}
+      />
     </div>
   );
 }

@@ -15,7 +15,23 @@ import { fitAxis } from "../lib/axisDomain";
 import type { SeriesByNode } from "../lib/groupReadings";
 import type { SensorType } from "../types";
 
-const NODE_COLORS = ["#2563eb", "#7c3aed", "#0891b2", "#ea580c", "#4d7c0f", "#be185d"];
+// Categorical series colors, in a fixed order validated for colour-vision
+// deficiency (adjacent pairs) and >= 3:1 contrast on light and dark chart
+// surfaces (dataviz reference palette: blue, orange, aqua, yellow, magenta,
+// green, violet, red). These are the light-surface steps; an app can swap in
+// its dark-surface steps by defining --series-1..8 (see shared-ui/README.md).
+const SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"];
+
+function seriesColor(slot: number): string {
+  const i = slot % SERIES_COLORS.length;
+  return `var(--series-${i + 1}, ${SERIES_COLORS[i]})`;
+}
+
+// Node i's real line takes slot 2i and its estimate slot 2i + 1, so with one
+// node (the usual case) the reading is blue and the estimate orange, and
+// every node's estimate is a different hue from every real line.
+const realColor = (nodeIndex: number) => seriesColor(2 * nodeIndex);
+const estimateColor = (nodeIndex: number) => seriesColor(2 * nodeIndex + 1);
 
 function formatTime(value: string): string {
   const date = new Date(value);
@@ -25,7 +41,11 @@ function formatTime(value: string): string {
 export interface ThresholdLineChartProps {
   sensorType: SensorType;
   seriesByNode: SeriesByNode;
-  height?: number;
+  /** Pixels, or a percentage of a parent that has its own height (e.g. an
+   * expanded view). */
+  height?: number | `${number}%`;
+  /** Draw the lag-compensated estimate lines, if the data has any. */
+  showEstimate?: boolean;
 }
 
 /** One chart per sensor_type — used by the laptop dashboard's live view
@@ -42,27 +62,36 @@ export interface ThresholdLineChartProps {
  * clipped to whatever range is showing.
  *
  * Points carrying an `estimate` (lib/lagEstimate.ts) get a second, dashed
- * line in the node's colour: the lag-compensated estimate of the true level.
+ * line in a different colour (see realColor/estimateColor): the
+ * lag-compensated estimate of the true level. `showEstimate={false}` hides
+ * it, and the y-axis then fits the readings alone.
  *
  * Consuming apps must define the CSS custom properties `--chart-grid` and
  * `--chart-axis` (see shared-ui/README.md).
  */
-export function ThresholdLineChart({ sensorType, seriesByNode, height = 200 }: ThresholdLineChartProps) {
+export function ThresholdLineChart({
+  sensorType,
+  seriesByNode,
+  height = 200,
+  showEstimate = true,
+}: ThresholdLineChartProps) {
   const threshold = THRESHOLDS[sensorType];
   const nodeIds = Object.keys(seriesByNode);
-  const hasEstimate = nodeIds.some((id) => seriesByNode[id].some((p) => p.estimate !== undefined));
+  const estimatedNodeIds = showEstimate
+    ? nodeIds.filter((id) => seriesByNode[id].some((p) => p.estimate !== undefined))
+    : [];
   const axis = useMemo(
     () =>
       fitAxis(
         nodeIds.flatMap((id) =>
           seriesByNode[id].flatMap((point) =>
-            point.estimate === undefined ? [point.value] : [point.value, point.estimate],
+            !showEstimate || point.estimate === undefined ? [point.value] : [point.value, point.estimate],
           ),
         ),
         threshold.minSpan,
         [threshold.min, threshold.max],
       ),
-    [seriesByNode, threshold],
+    [seriesByNode, threshold, showEstimate],
   );
 
   return (
@@ -118,26 +147,26 @@ export function ThresholdLineChart({ sensorType, seriesByNode, height = 200 }: T
             data={seriesByNode[nodeId]}
             dataKey="value"
             name={nodeId}
-            stroke={NODE_COLORS[i % NODE_COLORS.length]}
+            stroke={realColor(i)}
+            strokeWidth={2}
             dot={false}
             isAnimationActive={false}
           />
         ))}
-        {nodeIds
-          .filter((nodeId) => seriesByNode[nodeId].some((p) => p.estimate !== undefined))
-          .map((nodeId) => (
-            <Line
-              key={`${nodeId}-estimate`}
-              data={seriesByNode[nodeId]}
-              dataKey="estimate"
-              name={`${nodeId} (estimated)`}
-              stroke={NODE_COLORS[nodeIds.indexOf(nodeId) % NODE_COLORS.length]}
-              strokeDasharray="6 4"
-              dot={false}
-              isAnimationActive={false}
-            />
-          ))}
-        {(nodeIds.length > 1 || hasEstimate) && <Legend wrapperStyle={{ fontSize: 12 }} />}
+        {estimatedNodeIds.map((nodeId) => (
+          <Line
+            key={`${nodeId}-estimate`}
+            data={seriesByNode[nodeId]}
+            dataKey="estimate"
+            name={`${nodeId} (estimated)`}
+            stroke={estimateColor(nodeIds.indexOf(nodeId))}
+            strokeWidth={2}
+            strokeDasharray="6 4"
+            dot={false}
+            isAnimationActive={false}
+          />
+        ))}
+        {(nodeIds.length > 1 || estimatedNodeIds.length > 0) && <Legend wrapperStyle={{ fontSize: 12 }} />}
       </LineChart>
     </ResponsiveContainer>
   );

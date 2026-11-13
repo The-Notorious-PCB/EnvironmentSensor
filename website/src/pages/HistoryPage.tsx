@@ -1,9 +1,20 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { groupBySensorAndNode, SENSOR_TYPES, THRESHOLDS, ThresholdLineChart, withEstimates } from "shared-ui";
+import {
+  groupBySensorAndNode,
+  SENSOR_TYPES,
+  THRESHOLDS,
+  ThresholdLineChart,
+  withEstimates,
+  type SensorType,
+} from "shared-ui";
+import { ChartModal } from "../components/ChartModal";
+import { EstimateToggle } from "../components/EstimateToggle";
+import { ExpandablePanel } from "../components/ExpandablePanel";
 import { useDevices } from "../hooks/useDevices";
 import { useDeviceSessions } from "../hooks/useDeviceSessions";
 import { useSessionReadings } from "../hooks/useSessionReadings";
+import { useShowEstimates } from "../hooks/useShowEstimates";
 import { downloadCsv, readingsToCsv, sessionCsvFilename } from "../lib/csv";
 import { formatSessionLabel } from "../lib/format";
 
@@ -23,6 +34,8 @@ export function HistoryPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
+  const [showEstimates, setShowEstimates] = useShowEstimates();
+  const [expanded, setExpanded] = useState<SensorType | null>(null);
   const { readings, loading: readingsLoading, error: readingsError } = useSessionReadings(
     selectedSessionId,
   );
@@ -62,6 +75,7 @@ export function HistoryPage() {
 
   function selectSession(sessionId: string | null) {
     setSelectedSessionId(sessionId);
+    setExpanded(null);
     setDeleteError(null);
     setDeleteNotice(null);
   }
@@ -155,14 +169,45 @@ export function HistoryPage() {
       {readingsError && <p className="error">Could not load readings: {readingsError}</p>}
 
       {sensorsWithData.length > 0 && (
-        <div className="sensor-grid">
-          {sensorsWithData.map((sensorType) => (
-            <div key={sensorType} className="sensor-panel">
-              <h3>{THRESHOLDS[sensorType].label}</h3>
-              <ThresholdLineChart sensorType={sensorType} seriesByNode={grouped[sensorType]!} height={220} />
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="chart-options">
+            <EstimateToggle checked={showEstimates} onChange={setShowEstimates} />
+          </div>
+          <div className="sensor-grid">
+            {sensorsWithData.map((sensorType) => (
+              <ExpandablePanel
+                key={sensorType}
+                label={THRESHOLDS[sensorType].label}
+                onExpand={() => setExpanded(sensorType)}
+              >
+                <div className="sensor-panel">
+                  <h3>{THRESHOLDS[sensorType].label}</h3>
+                  <ThresholdLineChart
+                    sensorType={sensorType}
+                    seriesByNode={grouped[sensorType]!}
+                    height={220}
+                    showEstimate={showEstimates}
+                  />
+                </div>
+              </ExpandablePanel>
+            ))}
+          </div>
+        </>
+      )}
+
+      {expanded && grouped[expanded] && (
+        <ChartModal
+          title={THRESHOLDS[expanded].label}
+          controls={<EstimateToggle checked={showEstimates} onChange={setShowEstimates} />}
+          onClose={() => setExpanded(null)}
+        >
+          <ThresholdLineChart
+            sensorType={expanded}
+            seriesByNode={grouped[expanded]!}
+            height="100%"
+            showEstimate={showEstimates}
+          />
+        </ChartModal>
       )}
     </div>
   );
