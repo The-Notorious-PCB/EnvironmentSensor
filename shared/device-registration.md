@@ -16,9 +16,10 @@ and
 
 The website has no accounts, no sign-up/log-in pages, nothing gating
 access. Anyone with the site URL can see every registered device and its
-readings, register a new device, rename/deactivate any existing one, or
-delete any recorded session (History page, behind a confirmation — see
-"Security notes").
+readings, register a new device, rename/deactivate any existing one,
+delete any recorded session (History page), or remove any device with all
+its readings (device list), the last two behind a confirmation — see
+"Security notes".
 
 This is a deliberate simplification, not an oversight: the original design
 had per-user accounts (`sensor_arrays.owner_id` → `auth.users`, RLS scoping
@@ -131,11 +132,19 @@ status is active."
 
 ## Security notes
 
-- `api_key_hash` is never returned by any query — this held true before
-  removing login and still holds true after. `sensor_arrays`' column
+- `api_key_hash` is never returned by any query. `sensor_arrays`' column
   grants are an explicit allowlist of the other columns, so a future
   column added to the table is excluded by default until someone
-  deliberately grants it, rather than needing a revoke to be remembered.
+  deliberately grants it. **Until 2026-11-13 this didn't hold on the live
+  project:** Supabase's default privileges also give `anon` a table-level
+  SELECT on every new table, which covers every column, so the hashes were
+  readable with the anon key. Plain Postgres has no such default, which is
+  why verification missed it.
+  [`20261113140000_sensor_arrays_grants.sql`](../supabase/migrations/20261113140000_sensor_arrays_grants.sql)
+  revokes everything and grants the column lists back. (A bcrypt hash of a
+  random 256-bit key isn't practically crackable, so the exposure didn't
+  give away any device's key.) Any new table needs the same revoke-first
+  treatment.
 - The API key is generated and hashed **inside** `register_device`, never
   client-supplied — a caller can't choose (or downgrade) their own key.
 - `verify_device_api_key` has no grants to any role; it's only reachable
@@ -158,3 +167,12 @@ status is active."
   one device per call, never arbitrary rows. If that ever needs
   tightening, check the device's API key in it the way `ingest_readings`
   does.
+- And anyone can remove any device, through `delete_device(device_id)`
+  ([`20261113150000_delete_device.sql`](../supabase/migrations/20261113150000_delete_device.sql)),
+  which the website's device list calls after a confirmation dialog. It
+  deletes the device's readings and then the device itself (the
+  `readings.device_id` foreign key is `on delete set null`, so deleting
+  only the device would leave its readings behind, unattached). Its API
+  key stops working at once; the relay box has to be registered again as
+  a new device to record. Same tradeoff and same way to tighten it as
+  `delete_session`.

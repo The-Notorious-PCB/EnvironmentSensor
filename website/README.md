@@ -32,7 +32,9 @@ src/
   pages/
     RegisterDevicePage.tsx    register a device (no login), show its API
                               key once
-    DeviceListPage.tsx         every device, status, last_seen_at
+    DeviceListPage.tsx         every device, status, last_seen_at;
+                               remove a device and its readings
+                               (delete_device RPC, after a confirmation)
     LiveViewPage.tsx            Realtime charts for one device
     HistoryPage.tsx              session picker + charts for one device;
                                  download a session as CSV, delete a

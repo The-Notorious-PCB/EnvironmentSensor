@@ -170,7 +170,8 @@ earlier per-user-ownership design would have blocked this), so it's worth
 a heads-up to the digital-twin team regardless: don't assume today's open
 access is permanent if per-user accounts ever come back.
 
-Sessions can also disappear: anyone can delete a session's readings from
-the website's History page (`delete_session` RPC, see
-`shared/device-registration.md`'s security notes). Worth telling them, so
-a session vanishing isn't mistaken for a sync bug.
+Sessions and devices can also disappear: anyone can delete a session's
+readings from the website's History page (`delete_session` RPC), or remove
+a device with all its readings from the device list (`delete_device`
+RPC); see `shared/device-registration.md`'s security notes. Worth telling
+them, so data vanishing isn't mistaken for a sync bug.

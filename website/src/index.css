@@ -257,6 +257,29 @@ button.button:disabled {
   color: var(--text-muted);
 }
 
+/* A button that sits inline with links, e.g. the device list's actions. */
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.link-button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.link-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.link-button-danger {
+  color: #ef4444;
+}
+
 .device-table {
   width: 100%;
   border-collapse: collapse;

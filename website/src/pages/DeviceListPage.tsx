@@ -1,9 +1,40 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useDevices } from "../hooks/useDevices";
 import { formatLastSeen } from "../lib/format";
+import type { SensorArrayRow } from "../types";
 
 export function DeviceListPage() {
-  const { devices, loading, error } = useDevices();
+  const { devices, loading, error, removeDevice } = useDevices();
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removeNotice, setRemoveNotice] = useState<string | null>(null);
+
+  async function handleRemove(device: SensorArrayRow) {
+    const message =
+      `Remove the device "${device.name}"?\n\n` +
+      "This permanently deletes the device and every session and reading it recorded " +
+      "from the cloud database, for everyone, including the digital-twin team. " +
+      "It can't be undone. (The laptop collector's own copy is not affected.)\n\n" +
+      "Its API key stops working immediately: to record with this relay box again, " +
+      "register it as a new device and update its collector settings.";
+    if (!window.confirm(message)) return;
+
+    setRemovingId(device.id);
+    setRemoveError(null);
+    setRemoveNotice(null);
+    try {
+      const deleted = await removeDevice(device.id);
+      setRemoveNotice(`Removed "${device.name}" and its ${deleted} readings.`);
+    } catch (removeFailure) {
+      setRemoveError(
+        `Could not remove "${device.name}": ` +
+          (removeFailure instanceof Error ? removeFailure.message : String(removeFailure)),
+      );
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   return (
     <div>
@@ -16,6 +47,8 @@ export function DeviceListPage() {
 
       {loading && <p>Loading devices…</p>}
       {error && <p className="error">Could not load devices: {error}</p>}
+      {removeNotice && <p className="notice">{removeNotice}</p>}
+      {removeError && <p className="error">{removeError}</p>}
       {!loading && !error && devices.length === 0 && <p>No devices registered yet.</p>}
 
       {devices.length > 0 && (
@@ -40,6 +73,15 @@ export function DeviceListPage() {
                   <Link to={`/live/${device.id}`}>Live</Link>
                   {" · "}
                   <Link to={`/history/${device.id}`}>History</Link>
+                  {" · "}
+                  <button
+                    type="button"
+                    className="link-button link-button-danger"
+                    onClick={() => handleRemove(device)}
+                    disabled={removingId !== null}
+                  >
+                    {removingId === device.id ? "Removing…" : "Remove"}
+                  </button>
                 </td>
               </tr>
             ))}

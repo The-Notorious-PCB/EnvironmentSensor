@@ -99,6 +99,31 @@ in this sequence):
    live project); after, it's refused with "permission denied", while
    reads, `device_sessions`, `ingest_readings` and `delete_session` still
    work.
+8. [`20261113140000_sensor_arrays_grants.sql`](migrations/20261113140000_sensor_arrays_grants.sql)
+   — the same default-privileges problem on `sensor_arrays`, but worse:
+   the table-level SELECT Supabase grants by default covers every column,
+   so `api_key_hash` was readable with the anon key on the live project
+   (found 2026-11-13), despite the column-level allowlist in migrations 2
+   and 4. Revokes everything from `anon`/`authenticated` and grants the
+   column lists back. Verified in PGlite with Supabase's defaults: before,
+   `select api_key_hash` as `anon` returns the hash; after, it and
+   `select *` are refused, direct INSERT/DELETE and updating
+   `api_key_hash` are refused, while the website's column list, updating
+   `name`/`status`, `register_device` and `ingest_readings` still work.
+9. [`20261113150000_delete_device.sql`](migrations/20261113150000_delete_device.sql)
+   — `delete_device(device_id)`, open to anyone, which the website's
+   device list calls (after a confirmation) to remove a device and every
+   reading it recorded. Verified in PGlite: deletes only that device's
+   readings, sessions and row, raises "device not found" for an unknown
+   or already-deleted ID (deleting nothing), and the removed device's key
+   is rejected by `ingest_readings` afterwards.
+
+**Lesson from 7 and 8:** Supabase grants `anon`/`authenticated` every
+privilege on each new table in `public`. A migration adding a table
+should revoke first and then grant only what's needed, and verification
+in plain Postgres should reproduce that default (`alter default
+privileges in schema public grant all on tables to anon, authenticated`)
+or it will miss leaks like 8.
 
 The first five verified by hand against a local Postgres 16 instance, applied in
 order **from a completely empty database** (register a device with no
