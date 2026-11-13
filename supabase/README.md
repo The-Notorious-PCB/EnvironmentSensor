@@ -82,12 +82,23 @@ in this sequence):
    order, in PGlite (Postgres 16 in WASM) with Supabase's layout stubbed
    in (`anon`/`authenticated` roles, `auth.users`, pgcrypto functions in
    `extensions`): as `anon` it deletes only the matching device's session
-   and returns the count. A direct DELETE on `readings` as `anon` fails
-   there with "permission denied", since PGlite has no DELETE grant. On
-   the live project, Supabase's default grants seem to include DELETE, so
-   the same request succeeds but deletes nothing (checked 2026-11-13 with
-   a filter matching no rows): RLS is on and no policy allows DELETE.
-   Either way, `delete_session` is the only way to delete readings.
+   and returns the count. On the live project a direct DELETE on
+   `readings` as `anon` was still accepted but deleted nothing (checked
+   2026-11-13 with a filter matching no rows): Supabase's default grants
+   include DELETE, and RLS has no policy allowing it. Migration 7 removes
+   the grant.
+7. [`20261113130000_readings_read_only_grants.sql`](migrations/20261113130000_readings_read_only_grants.sql)
+   — revokes INSERT/UPDATE/DELETE/TRUNCATE on `readings` from `anon` and
+   `authenticated`, so direct writes are refused outright instead of
+   relying on RLS having no write policy. Supabase grants every privilege
+   on new `public` tables to those roles by default; this undoes it for
+   `readings`, which they only ever read. `ingest_readings` and
+   `delete_session` are security definer, so they're unaffected. Verified
+   in PGlite with Supabase's default privileges reproduced: before, a
+   direct DELETE as `anon` is accepted and deletes nothing (same as the
+   live project); after, it's refused with "permission denied", while
+   reads, `device_sessions`, `ingest_readings` and `delete_session` still
+   work.
 
 The first five verified by hand against a local Postgres 16 instance, applied in
 order **from a completely empty database** (register a device with no
