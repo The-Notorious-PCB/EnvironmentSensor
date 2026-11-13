@@ -82,8 +82,12 @@ in this sequence):
    order, in PGlite (Postgres 16 in WASM) with Supabase's layout stubbed
    in (`anon`/`authenticated` roles, `auth.users`, pgcrypto functions in
    `extensions`): as `anon` it deletes only the matching device's session
-   and returns the count, and `anon` still has no direct DELETE on
-   `readings`.
+   and returns the count. A direct DELETE on `readings` as `anon` fails
+   there with "permission denied", since PGlite has no DELETE grant. On
+   the live project, Supabase's default grants seem to include DELETE, so
+   the same request succeeds but deletes nothing (checked 2026-11-13 with
+   a filter matching no rows): RLS is on and no policy allows DELETE.
+   Either way, `delete_session` is the only way to delete readings.
 
 The first five verified by hand against a local Postgres 16 instance, applied in
 order **from a completely empty database** (register a device with no
