@@ -29,5 +29,18 @@
       "tau2": 220.0,
       "window": 15
     }
+  },
+  "explorir-01": {
+    "co2": {
+      "calibrated_from": "cal-20261113-115705",
+      "calibrated_on": "2026-11-13",
+      "filter": 16,
+      "max": null,
+      "min": 0,
+      "model": "one_tau",
+      "part": "ExplorIR-M",
+      "tau": 12.0,
+      "window": 7
+    }
   }
 }
