@@ -22,6 +22,8 @@ src/
     axisDomain.ts          y-axis fitted to the data
     lagEstimate.ts         lag-compensated estimates: LiveEstimates for
                            live streams, withEstimates for whole sessions
+                           (one_tau, step-aware one_tau for sensors that
+                           report in coarse steps, two_tau)
   components/
     ThresholdLineChart.tsx  line chart with threshold bands
     SensorGauge.tsx          current-value gauge, colored by threshold
