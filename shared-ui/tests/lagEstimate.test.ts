@@ -3,13 +3,12 @@ import fixture from "./fixtures/lag-estimate.json";
 import { LagEstimator, LiveEstimates, lagParamsFor, withEstimates } from "../src/lib/lagEstimate";
 import type { LagParams } from "../src/lib/lagEstimate";
 
-// Real breath-test data (session 0645c07f, node bench-01; and an ExplorIR-M
-// calibration run, whose CO2 comes in 125 ppm steps) with the estimates
+// Real breath-test data (session 0645c07f, node bench-01) with the estimates
 // BreadBoardTest/tools/lag_response.py computed for it: the TypeScript port
 // must give the same numbers, or the live line and the analysis disagree.
 describe("LagEstimator matches lag_response.py", () => {
-  for (const c of fixture.cases as { name?: string; sensor: string; params: unknown; t: number[]; y: number[]; expected: number[] }[]) {
-    it(c.name ?? `${c.sensor} (${(c.params as LagParams).model})`, () => {
+  for (const c of fixture.cases) {
+    it(`${c.sensor} (${(c.params as LagParams).model})`, () => {
       const estimator = new LagEstimator(c.params as LagParams);
       c.t.forEach((t, i) => {
         const estimate = estimator.push(t, c.y[i]);
@@ -57,39 +56,6 @@ describe("LagEstimator", () => {
     const e = new LagEstimator({ model: "one_tau", tau: 100, window: 2, min: 0, max: 100 });
     e.push(0, 50);
     expect(e.push(1, 90)).toBe(100);
-  });
-});
-
-describe("LagEstimator on a stepped sensor (min_step)", () => {
-  const stepped: LagParams = { model: "one_tau", tau: 12, window: 3, min_step: 62 };
-
-  it("reads a steady signal as itself", () => {
-    const e = new LagEstimator(stepped);
-    let estimate = 0;
-    for (let t = 0; t < 30; t += 0.5) estimate = e.push(t, 251);
-    expect(estimate).toBe(251);
-  });
-
-  it("doesn't spike at each step of a slow fall, and eases onto the reading", () => {
-    // Falling one 125 ppm step every 10 s, then holding: a slope through the
-    // raw readings would read every step as a sudden fall.
-    const e = new LagEstimator(stepped);
-    const estimates: number[] = [];
-    for (let t = 0; t < 100; t += 0.5) {
-      const y = 1000 - 125 * Math.min(5, Math.floor(t / 10));
-      estimates.push(e.push(t, y));
-    }
-    const falling = estimates.slice(40, 100); // 20-50 s: steady slope of 12.5 ppm/s
-    for (const x of falling) expect(x).toBeGreaterThan(375 - 160);
-    // 50 s after the last step: within 20 ppm of the reading (the capped
-    // slope fades as 1/time, half a step per second since the last step).
-    expect(Math.abs(estimates[estimates.length - 1] - 375)).toBeLessThan(20);
-  });
-
-  it("ignores changes smaller than min_step", () => {
-    const e = new LagEstimator(stepped);
-    for (let t = 0; t < 20; t += 0.5) e.push(t, t % 2 === 0 ? 630 : 631);
-    expect(e.push(20, 630)).toBe(630);
   });
 });
 

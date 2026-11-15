@@ -12,17 +12,6 @@ import type { SeriesByNode, SeriesPoint } from "./groupReadings";
  * one_tau: reading y lags the true level x as dy/dt = (x - y) / tau, so
  *   x = y + tau * slope, slope from a least-squares line through the last
  *   `window` readings.
- * one_tau with min_step: for a sensor that reports in coarse steps (the
- *   0-100% ExplorIR-M counts in 100 ppm, ~125 after pressure correction),
- *   where a slope through the raw readings spikes at every step. Each step
- *   change marks when the sensor's own value crossed the midpoint between the
- *   two steps; the slope is a line through the last `window` of those
- *   crossings. Between steps the value is carried along that slope, capped at
- *   half a step per second since the last crossing and kept inside the
- *   current step, so after a change stops the estimate eases onto the
- *   reading. A change smaller than min_step isn't a step (the 1 ppm wobble
- *   as the pressure correction drifts); the step size itself is learned from
- *   the readings, since the pressure correction scales it.
  * two_tau: y = fast_share * fast + (1 - fast_share) * slow, where the slow
  *   part (e.g. a circuit board's heat, tau2) is simulated, easing toward the
  *   current estimate each step, and the one_tau rule (tau1) is applied to
@@ -42,9 +31,6 @@ interface Common {
 export interface OneTauParams extends Common {
   model: "one_tau";
   tau: number;
-  /** Set for a sensor that reports in steps: the slope then comes from the
-   * last `window` step changes, not the last `window` readings. */
-  min_step?: number;
 }
 export interface TwoTauParams extends Common {
   model: "two_tau";
@@ -71,11 +57,6 @@ export class LagEstimator {
   private lastT: number | undefined;
   private last = 0;
   private count = 0;
-  // step mode (one_tau with min_step)
-  private level: number | undefined;
-  private step: number | undefined;
-  private stepTimes: number[] = [];
-  private stepValues: number[] = [];
 
   constructor(readonly params: LagParams) {}
 
@@ -93,9 +74,6 @@ export class LagEstimator {
     this.lastT = t;
 
     const p = this.params;
-    if (p.model === "one_tau" && p.min_step !== undefined) {
-      return this.finish(this.stepEstimate(t, y, p.tau, p.window, p.min_step));
-    }
     let base: number;
     let tau: number;
     if (p.model === "two_tau") {
@@ -120,37 +98,9 @@ export class LagEstimator {
 
     const estimate = base + tau * slope(this.times, this.bases);
     this.prev = estimate;
-    return this.finish(estimate);
-  }
-
-  private finish(estimate: number): number {
     this.count += 1;
-    this.last = Math.min(Math.max(estimate, this.params.min ?? -Infinity), this.params.max ?? Infinity);
+    this.last = Math.min(Math.max(estimate, p.min ?? -Infinity), p.max ?? Infinity);
     return this.last;
-  }
-
-  /** Same as estimate_steps in BreadBoardTest/tools/lag_response.py. */
-  private stepEstimate(t: number, y: number, tau: number, window: number, minStep: number): number {
-    if (this.level !== undefined && Math.abs(y - this.level) >= minStep) {
-      const d = Math.abs(y - this.level);
-      this.step = this.step === undefined ? d : Math.min(this.step, d);
-      this.stepTimes.push(t);
-      this.stepValues.push((y + this.level) / 2);
-      if (this.stepTimes.length > window) {
-        this.stepTimes.shift();
-        this.stepValues.shift();
-      }
-    }
-    this.level = y;
-    const n = this.stepTimes.length;
-    if (n < 2 || this.step === undefined) return y;
-
-    const half = this.step / 2;
-    const since = t - this.stepTimes[n - 1];
-    let s = slope(this.stepTimes, this.stepValues);
-    if (since > 0) s = Math.min(Math.max(s, -half / since), half / since);
-    const value = Math.min(Math.max(this.stepValues[n - 1] + s * since, y - half), y + half);
-    return value + tau * s;
   }
 }
 
