@@ -291,3 +291,139 @@ async def test_run_sync_worker_uses_configurable_ingest_function_name():
     await client.aclose()
 
     assert seen_url["value"] == "https://example.supabase.co/rest/v1/rpc/ingest_readings_v2"
+
+
+# ---------------------------------------------------------------- sessions
+
+SESSION_URL = "https://example.supabase.co/rest/v1/rpc/upsert_session"
+
+
+def engine_with_sessions(rows: list) -> object:
+    from app.models.db import Session as SessionRow
+
+    engine = make_engine("sqlite://")
+    init_db(engine)
+    with DBSession(engine) as db:
+        for row in rows:
+            db.add(SessionRow(**row))
+        db.commit()
+    return engine
+
+
+def base_session(**overrides) -> dict:
+    fields = dict(
+        session_id="session-1",
+        subject_id="bench",
+        suit_config="rig",
+        name="Breath test",
+        device_id=DEVICE_ID,
+        start_time=datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc),
+    )
+    fields.update(overrides)
+    return fields
+
+
+async def test_sync_sessions_sends_this_devices_unsynced_sessions_and_marks_them():
+    from app.models.db import Session as SessionRow
+    from app.sync.worker import _sync_sessions_once
+
+    engine = engine_with_sessions([
+        base_session(),
+        base_session(session_id="other-device", device_id="someone-else"),
+        base_session(session_id="already", synced=True),
+    ])
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(204)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    sent = await _sync_sessions_once(engine, client, SESSION_URL, HEADERS, device_id=DEVICE_ID, api_key=API_KEY)
+    await client.aclose()
+
+    assert sent == 1
+    assert str(requests[0].url) == SESSION_URL
+    body = json.loads(requests[0].content)
+    assert body["p_device_id"] == DEVICE_ID and body["p_api_key"] == API_KEY
+    assert body["p_session"]["session_id"] == "session-1"
+    assert body["p_session"]["name"] == "Breath test"
+    assert body["p_session"]["end_time"] is None
+    with DBSession(engine) as db:
+        assert db.get(SessionRow, "session-1").synced is True
+        assert db.get(SessionRow, "other-device").synced is False
+
+
+async def test_sync_sessions_failure_leaves_session_unsynced():
+    from app.models.db import Session as SessionRow
+    from app.sync.worker import _sync_sessions_once
+
+    engine = engine_with_sessions([base_session()])
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(404, json={})))
+    try:
+        await _sync_sessions_once(engine, client, SESSION_URL, HEADERS, device_id=DEVICE_ID, api_key=API_KEY)
+        raised = False
+    except httpx.HTTPStatusError:
+        raised = True
+    await client.aclose()
+
+    assert raised
+    with DBSession(engine) as db:
+        assert db.get(SessionRow, "session-1").synced is False
+
+
+async def test_session_stopped_during_send_stays_unsynced():
+    from app.models.db import Session as SessionRow
+    from app.sync.worker import _sync_sessions_once
+
+    engine = engine_with_sessions([base_session()])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        # the session is stopped while this request is in flight
+        with DBSession(engine) as db:
+            row = db.get(SessionRow, "session-1")
+            row.end_time = datetime(2026, 11, 15, 12, 30, tzinfo=timezone.utc)
+            db.add(row)
+            db.commit()
+        return httpx.Response(204)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    await _sync_sessions_once(engine, client, SESSION_URL, HEADERS, device_id=DEVICE_ID, api_key=API_KEY)
+    await client.aclose()
+    with DBSession(engine) as db:
+        assert db.get(SessionRow, "session-1").synced is False
+
+
+async def test_run_sync_worker_keeps_syncing_readings_when_session_sync_fails():
+    engine = engine_with_readings([base_reading(seq=1)])
+    from app.models.db import Session as SessionRow
+
+    with DBSession(engine) as db:
+        db.add(SessionRow(**base_session()))
+        db.commit()
+    paths = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path.endswith("/upsert_session"):
+            return httpx.Response(404, json={"message": "Could not find the function"})
+        return httpx.Response(200, json=1)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    task = asyncio.create_task(
+        run_sync_worker(
+            engine=engine, supabase_url="https://example.supabase.co", supabase_key="key",
+            device_id=DEVICE_ID, api_key=API_KEY, interval_seconds=0.01, client=client,
+            retry_stop=stop_after_attempt(1), retry_wait=wait_fixed(0),
+        )
+    )
+    await asyncio.sleep(0.1)
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+    await client.aclose()
+
+    assert "/rest/v1/rpc/ingest_readings" in paths
+    assert "/rest/v1/rpc/upsert_session" in paths
+    with DBSession(engine) as db:
+        assert all(r.synced for r in db.exec(select(Reading)))

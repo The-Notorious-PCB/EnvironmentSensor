@@ -7,6 +7,10 @@
   --chart-grid: #e2e8f0;
   --chart-axis: #64748b;
   --accent: #2563eb;
+  --link: #1d4ed8;
+  --button: #2563eb; /* behind white button text */
+  --danger-text: #dc2626;
+  --ok-text: #16a34a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -15,10 +19,17 @@
     --surface: #1e293b;
     --border: #334155;
     --text: #f1f5f9;
-    --text-muted: #94a3b8;
+    /* Every text color here is bright on the dark background. */
+    --text-muted: #cbd5e1;
     --chart-grid: #334155;
-    --chart-axis: #94a3b8;
+    --chart-axis: #cbd5e1;
     --accent: #60a5fa;
+    --link: #93c5fd;
+    --button: #2563eb;
+    --danger-text: #fca5a5;
+    --ok-text: #4ade80;
+    /* Native controls (dropdowns, their option lists, scrollbars) in dark too. */
+    color-scheme: dark;
     /* Chart series, stepped for the dark surface (shared-ui ThresholdLineChart). */
     --series-1: #3987e5;
     --series-2: #d95926;
@@ -33,6 +44,13 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* Links in every state, so the browser's default blue/purple never shows
+   (unreadable on the dark background). :where keeps this weaker than any
+   class, so tab and button links keep their own colors. */
+:where(a:link, a:visited) {
+  color: var(--link);
 }
 
 body {
@@ -182,7 +200,7 @@ body {
 }
 
 .error {
-  color: #ef4444;
+  color: var(--danger-text);
 }
 
 /* --- website-specific --- */
@@ -220,7 +238,7 @@ body {
   padding: 8px 14px;
   border-radius: 6px;
   border: none;
-  background: var(--accent);
+  background: var(--button);
   color: white;
   cursor: pointer;
   font-size: 0.95rem;
@@ -241,7 +259,7 @@ body {
 .button {
   padding: 8px 14px;
   border-radius: 6px;
-  background: var(--accent);
+  background: var(--button);
   color: white;
   text-decoration: none;
   font-size: 0.9rem;
@@ -272,7 +290,7 @@ button.button:disabled {
   background: none;
   padding: 0;
   font: inherit;
-  color: var(--accent);
+  color: var(--link);
   cursor: pointer;
 }
 
@@ -286,7 +304,7 @@ button.button:disabled {
 }
 
 .link-button-danger {
-  color: #ef4444;
+  color: var(--danger-text);
 }
 
 .device-table {
@@ -321,7 +339,7 @@ button.button:disabled {
 
 .status-active {
   background: rgba(34, 197, 94, 0.15);
-  color: #16a34a;
+  color: var(--ok-text);
 }
 
 .status-inactive {

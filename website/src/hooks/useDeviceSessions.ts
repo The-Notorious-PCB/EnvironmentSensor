@@ -12,10 +12,8 @@ export interface UseDeviceSessions {
   deleteSession: (sessionId: string) => Promise<number>;
 }
 
-/** Past sessions for one device, derived from the `device_sessions` view
- * (grouped from `readings` — see supabase/migrations, and
- * collector/README.md's "Not synced yet" note on why session metadata
- * itself isn't available here).
+/** Past sessions for one device, from the `device_sessions` view (readings
+ * grouped by session, plus the session's name; see supabase/migrations).
  */
 export function useDeviceSessions(deviceId: string | undefined): UseDeviceSessions {
   const [sessions, setSessions] = useState<DeviceSessionRow[]>([]);
@@ -34,7 +32,9 @@ export function useDeviceSessions(deviceId: string | undefined): UseDeviceSessio
 
     supabase
       .from("device_sessions")
-      .select("session_id, device_id, start_time, end_time, reading_count")
+      // "*" rather than a column list, so the page still loads on a database
+      // without the sessions migration (no `name` column yet).
+      .select("*")
       .eq("device_id", deviceId)
       .order("start_time", { ascending: false })
       .then(({ data, error: fetchError }) => {

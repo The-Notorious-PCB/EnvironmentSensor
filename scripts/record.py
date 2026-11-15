@@ -4,6 +4,11 @@ the collector, starts a session, and on Ctrl-C stops the session and the
 collector cleanly.
 
     python3 scripts/record.py --device breadboard --subject bench --suit-config "breadboard rig"
+    python3 scripts/record.py --device explorir --subject bench --session-name "Breath test 2"
+
+--session-name names the session; it's what the website's History page and
+the dashboard's playback list show. Without it, the script asks for one
+(Enter skips) when run in a terminal.
 
 First run for a device: there's no collector/.env.<device>.local yet, so this
 registers a new device on the website (same register_device call the Register
@@ -186,6 +191,8 @@ def main() -> None:
     ap.add_argument("--subject", required=True, help="session subject_id, e.g. bench or a test subject")
     ap.add_argument("--suit-config", default="", help="session suit_config, e.g. 'helmet v1'")
     ap.add_argument("--notes", default=None, help="session notes")
+    ap.add_argument("--session-name",
+                    help="name for this session, shown in History (asked for if not given)")
     ap.add_argument("--name", help="display name when registering (default: --device)")
     ap.add_argument("--env-file", help="use this settings file instead of collector/.env.<device>.local")
     ap.add_argument("--port", help="relay box serial port, overriding the settings file")
@@ -207,6 +214,14 @@ def main() -> None:
         write_env_file(env_path, settings)
         log(f"registered device {settings['COLLECTOR_DEVICE_ID']}; settings saved to "
             f"{env_path} (keep it, the API key can't be shown again)")
+
+    session_name = args.session_name
+    if session_name is None and sys.stdin.isatty():
+        try:
+            session_name = input("Session name (Enter to skip): ")
+        except EOFError:
+            session_name = ""
+    session_name = (session_name or "").strip() or None
 
     port = args.port or settings.get("COLLECTOR_SERIAL_PORT", "")
     if not port or not os.path.exists(port):
@@ -254,9 +269,11 @@ def main() -> None:
     try:
         wait_for_health(base, proc)
         session = api(base, "POST", "/sessions",
-                      {"subject_id": args.subject, "suit_config": args.suit_config, "notes": args.notes})
+                      {"subject_id": args.subject, "suit_config": args.suit_config, "notes": args.notes,
+                       "name": session_name})
         session_id = session["session_id"]
-        log(f"session {session_id} started on {port}")
+        named = f" \"{session['name']}\"" if session.get("name") else ""
+        log(f"session{named} {session_id} started on {port}")
         if settings.get("COLLECTOR_DEVICE_ID"):
             log(f"live: {WEBSITE_URL}#/live/{settings['COLLECTOR_DEVICE_ID']}")
         log("recording. Ctrl-C to stop.")

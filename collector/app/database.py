@@ -19,5 +19,26 @@ def make_engine(database_url: str) -> Engine:
     return create_engine(database_url, connect_args=connect_args, **kwargs)
 
 
+# Columns added after a laptop's database may already exist. create_all makes
+# missing tables but never changes existing ones, so init_db adds these
+# itself. Existing sessions get synced = 1: they predate session sync, and
+# may belong to a different device than the one the collector now runs as.
+ADDED_COLUMNS = {
+    "sessions": [
+        ("name", "VARCHAR"),
+        ("device_id", "VARCHAR"),
+        ("synced", "BOOLEAN NOT NULL DEFAULT 1"),
+    ],
+}
+
+
 def init_db(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
+    if engine.dialect.name != "sqlite":
+        return
+    with engine.begin() as conn:
+        for table, columns in ADDED_COLUMNS.items():
+            have = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+            for name, ddl in columns:
+                if name not in have:
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")

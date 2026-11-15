@@ -101,10 +101,12 @@ The `readings`/`sensor_arrays` tables, RLS policies, and the
 directory and [`shared/device-registration.md`](../shared/device-registration.md)
 for the schema and the full registration/auth flow.
 
-**Not synced yet:** `sessions` metadata (`subject_id`, `suit_config`, etc.)
-isn't pushed to Supabase — only `readings`. A consumer reading straight from
-Supabase today sees readings tagged with a `session_id` but no session
-details to look it up against. That's fine for now since the only
-documented consumer (the digital-twin team, see
-[CLAUDE.md](../CLAUDE.md#for-the-digital-twin-team)) only needs the sensor
-stream, but worth flagging if that changes.
+**Sessions are synced too** (name, `subject_id`, `suit_config`, notes,
+start/end), into Supabase's `sessions` table through the `upsert_session`
+RPC, which checks the device's API key like `ingest_readings`. A session is
+sent when it starts and again when it stops. Each session records the
+device the collector ran as when it started (`COLLECTOR_DEVICE_ID`), and is
+only ever sent under that device, since one laptop's database can hold
+several devices' sessions. Sessions recorded before this was added aren't
+sent. If the `sessions` migration isn't applied yet, the collector logs a
+warning once a minute and readings sync as normal.

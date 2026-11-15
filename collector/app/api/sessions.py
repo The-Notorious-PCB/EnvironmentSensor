@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, field_validator
 from sqlmodel import Session as DBSession
 from sqlmodel import select
 
@@ -18,11 +18,19 @@ class SessionCreate(BaseModel):
     subject_id: str
     suit_config: str
     notes: Optional[str] = None
+    name: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def blank_name_is_none(cls, name: Optional[str]) -> Optional[str]:
+        name = (name or "").strip()
+        return name or None
 
 
 @router.post("", response_model=SessionRow, status_code=201)
 def start_session(
     body: SessionCreate,
+    request: Request,
     db: DBSession = Depends(get_db),
     session_manager: SessionManager = Depends(get_session_manager),
 ) -> SessionRow:
@@ -33,6 +41,8 @@ def start_session(
         subject_id=body.subject_id,
         suit_config=body.suit_config,
         notes=body.notes,
+        name=body.name,
+        device_id=getattr(request.app.state, "device_id", None),
         start_time=datetime.now(timezone.utc),
     )
     db.add(session_row)
@@ -54,6 +64,7 @@ def stop_session(
 
     if session_row.end_time is None:
         session_row.end_time = datetime.now(timezone.utc)
+        session_row.synced = False  # send the end time to Supabase
         db.add(session_row)
         db.commit()
         db.refresh(session_row)

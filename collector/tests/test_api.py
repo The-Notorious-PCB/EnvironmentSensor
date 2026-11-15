@@ -116,3 +116,33 @@ def test_websocket_connects_and_disconnects_cleanly(client):
     # endpoint's cleanup runs on the server's event loop asynchronously, so
     # there's no synchronous point here to assert it's been removed —
     # covered instead by test_broadcast.py's disconnect test.
+
+
+def test_session_name_is_stored_and_blank_means_none():
+    app = create_app(database_url="sqlite://", start_serial=False, device_id="dev-1")
+    with TestClient(app) as c:
+        r = c.post("/sessions", json={"subject_id": "bench", "suit_config": "rig", "name": "  Breath test 1 "})
+        assert r.status_code == 201
+        session = r.json()
+        assert session["name"] == "Breath test 1"
+        # tagged with the device this collector runs as, for session sync
+        assert session["device_id"] == "dev-1"
+        assert session["synced"] is False
+        c.post(f"/sessions/{session['session_id']}/stop")
+
+        r = c.post("/sessions", json={"subject_id": "bench", "suit_config": "rig", "name": "   "})
+        assert r.json()["name"] is None
+        assert c.get("/sessions").json()[0]["name"] is None
+
+
+def test_stopping_a_session_marks_it_for_sync(client):
+    session = client.post("/sessions", json={"subject_id": "s", "suit_config": "x"}).json()
+    app = client.app
+    with DBSession(app.state.engine) as db:
+        from app.models.db import Session as SessionRow
+
+        row = db.get(SessionRow, session["session_id"])
+        row.synced = True
+        db.add(row)
+        db.commit()
+    assert client.post(f"/sessions/{session['session_id']}/stop").json()["synced"] is False

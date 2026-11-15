@@ -38,9 +38,12 @@ Set up the collector's environment once (step 3 below), plug in the relay
 box, then:
 
 ```
-python3 scripts/record.py --device breadboard --subject bench --suit-config "breadboard rig"
+python3 scripts/record.py --device breadboard --subject bench --suit-config "breadboard rig" --session-name "Breath test 1"
 ```
 
+- **Session name:** shown in the website's History list and the
+  dashboard's playback list. Leave out `--session-name` and it asks (Enter
+  skips).
 - **New device** (no `collector/.env.<device>.local` yet): asks, then
   registers it on the website and saves its settings file for you.
 - **Every run:** starts the collector, starts a session, prints the live
@@ -107,10 +110,11 @@ same thing by hand.
 
    ```
    curl -X POST localhost:8000/sessions -H 'Content-Type: application/json' \
-        -d '{"subject_id":"bench","suit_config":"helmet v1"}'
+        -d '{"subject_id":"bench","suit_config":"helmet v1","name":"Breath test 1"}'
    ```
 
-   Note the `session_id` it returns.
+   Note the `session_id` it returns. `name` is optional; it's what History
+   shows for the session.
 
 4. **Watch it live:** website → **Live** → pick the device (about 1 s
    behind), or the laptop dashboard.

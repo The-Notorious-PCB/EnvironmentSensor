@@ -41,4 +41,17 @@ describe("formatSessionLabel", () => {
     });
     expect(label).toContain("42 readings");
   });
+
+  it("leads with the session's name when it has one", () => {
+    const base = {
+      session_id: "s1",
+      device_id: "d1",
+      start_time: "2026-09-24T12:00:00Z",
+      end_time: "2026-09-24T12:05:00Z",
+      reading_count: 42,
+    };
+    expect(formatSessionLabel({ ...base, name: "Breath test 2" })).toMatch(/^Breath test 2 — /);
+    expect(formatSessionLabel({ ...base, name: null })).toBe(formatSessionLabel(base));
+    expect(formatSessionLabel({ ...base, name: "  " })).toBe(formatSessionLabel(base));
+  });
 });

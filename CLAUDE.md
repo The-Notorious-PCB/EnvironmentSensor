@@ -159,6 +159,8 @@ They consume readings via the Supabase REST API, not our local SQLite or
 serial stream directly. Schema/field changes to the synced rows are a
 breaking-change surface for them — coordinate before renaming or repurposing
 fields in `sensor_type`, `unit`, or the table shape pushed by `collector/app/sync`.
+Session details (name, subject, suit config, notes, start/end) are in the
+`sessions` table, joined to `readings` on `(device_id, session_id)`.
 
 [`supabase/migrations`](supabase/migrations) added Row Level Security on
 `readings`, but the site has no login (see

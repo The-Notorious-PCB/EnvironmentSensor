@@ -57,9 +57,9 @@ in this sequence):
    changes what the collector's current (anon-key) sync calls are allowed
    to do.
 3. [`20260924120000_device_sessions_and_realtime.sql`](migrations/20260924120000_device_sessions_and_realtime.sql)
-   — adds the `device_sessions` view (derived session summaries, since
-   session metadata itself isn't synced — see `collector/README.md`'s "Not
-   synced yet") and Realtime replication on `readings`, both needed by
+   — adds the `device_sessions` view (session summaries derived from
+   readings; session details weren't synced until migration 10) and
+   Realtime replication on `readings`, both needed by
    `website`'s history and live pages.
 4. [`20260925000000_remove_device_ownership.sql`](migrations/20260925000000_remove_device_ownership.sql)
    — removes the website's login system: drops `sensor_arrays.owner_id`
@@ -117,6 +117,21 @@ in this sequence):
    readings, sessions and row, raises "device not found" for an unknown
    or already-deleted ID (deleting nothing), and the removed device's key
    is rejected by `ingest_readings` afterwards.
+10. [`20261115120000_sessions.sql`](migrations/20261115120000_sessions.sql)
+   — a `sessions` table (name, subject, suit config, notes, start/end per
+   device and session), written only through `upsert_session`, which
+   checks the device's API key like `ingest_readings`; readable by anyone.
+   Adds `name` to `device_sessions` (last column, so the existing columns
+   are unchanged), and `delete_session` now removes the session's row too
+   (`delete_device` already cascades). Revokes Supabase's default write
+   grants before granting SELECT, per the lesson below. Verified in PGlite
+   from an empty database with all ten migrations and Supabase's defaults
+   reproduced: `upsert_session` accepts the device's own key and refuses a
+   wrong key or another device's key, a second call updates the row (the
+   stop time), `device_sessions` returns names (null where there's none)
+   and the old column list still works, direct INSERT/UPDATE/DELETE on
+   `sessions` as `anon` are refused, and `delete_session`/`delete_device`
+   remove the rows.
 
 **Lesson from 7 and 8:** Supabase grants `anon`/`authenticated` every
 privilege on each new table in `public`. A migration adding a table

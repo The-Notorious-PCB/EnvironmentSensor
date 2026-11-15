@@ -56,8 +56,9 @@ That was always independent of user login (the collector was never a
   key once, a device list (status, `last_seen_at`), a Realtime-fed live
   view, and a history view backed by the `device_sessions` view. Deployed
   to GitHub Pages via `.github/workflows/deploy-website.yml`.
-- `device_sessions` (a view, not a table — session metadata itself still
-  isn't synced, see `collector/README.md`'s "Not synced yet") and Realtime
+- `device_sessions` (a view: readings grouped by session, plus the
+  session's name from the `sessions` table the collector syncs through
+  `upsert_session`) and Realtime
   replication on `readings` — what the website's history and live pages
   actually query/subscribe to.
 

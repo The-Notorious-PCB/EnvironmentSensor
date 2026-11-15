@@ -3,10 +3,16 @@ import { groupBySensorAndNode, SENSOR_TYPES, THRESHOLDS, ThresholdLineChart, wit
 import { useSessionReadings } from "../hooks/useSessionReadings";
 import { useSessions } from "../hooks/useSessions";
 
-function formatSessionLabel(session: { subject_id: string; start_time: string; end_time: string | null }): string {
+function formatSessionLabel(session: {
+  subject_id: string;
+  start_time: string;
+  end_time: string | null;
+  name?: string | null;
+}): string {
   const started = new Date(session.start_time).toLocaleString();
   const status = session.end_time ? "" : " (in progress)";
-  return `${session.subject_id} — ${started}${status}`;
+  const name = session.name?.trim();
+  return `${name ? `${name} — ` : ""}${session.subject_id} — ${started}${status}`;
 }
 
 export function PlaybackView() {

@@ -71,6 +71,7 @@ session).
 | `start_time` | datetime (UTC) | when the session started |
 | `end_time` | datetime (UTC), nullable | null while the session is in progress |
 | `notes` | string, nullable | free-text session notes |
+| `name` | string, nullable | short name shown in History/playback lists (`record.py --session-name`) |
 
 ## `readings` table
 

@@ -12,5 +12,6 @@ export function formatLastSeen(value: string | null, now: Date = new Date()): st
 
 export function formatSessionLabel(session: DeviceSessionRow): string {
   const started = new Date(session.start_time).toLocaleString();
-  return `${started} — ${session.reading_count} readings`;
+  const name = session.name?.trim();
+  return `${name ? `${name} — ` : ""}${started} — ${session.reading_count} readings`;
 }

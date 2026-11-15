@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from typing import List, Optional
 
 import httpx
@@ -8,11 +9,14 @@ from sqlmodel import select
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.models.db import Reading
+from app.models.db import Session as SessionRow
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_RETRY_STOP = stop_after_attempt(5)
 DEFAULT_RETRY_WAIT = wait_exponential(multiplier=1, min=1, max=30)
+SESSION_FUNCTION = "upsert_session"
+SESSION_WARN_EVERY_S = 60.0
 
 
 def _reading_payload(reading: Reading) -> dict:
@@ -121,6 +125,71 @@ async def _sync_once(
     return len(batch)
 
 
+def _session_payload(row: SessionRow) -> dict:
+    """Session details sent to the `upsert_session` RPC (supabase/migrations/
+    20261115120000_sessions.sql)."""
+    return {
+        "session_id": row.session_id,
+        "name": row.name,
+        "subject_id": row.subject_id,
+        "suit_config": row.suit_config,
+        "notes": row.notes,
+        "start_time": row.start_time.isoformat(),
+        "end_time": row.end_time.isoformat() if row.end_time else None,
+    }
+
+
+def _fetch_unsynced_sessions(engine, device_id: str) -> List[SessionRow]:
+    with DBSession(engine) as db:
+        statement = (
+            select(SessionRow)
+            .where(SessionRow.synced == False)  # noqa: E712
+            .where(SessionRow.device_id == device_id)
+            .order_by(SessionRow.start_time)
+        )
+        return list(db.exec(statement))
+
+
+def _mark_session_synced(engine, session_id: str, sent: dict) -> None:
+    """Marks a session synced only if it still matches what was sent: if it
+    was stopped while the request was in flight, it stays unsynced and the
+    end time goes out next cycle."""
+    with DBSession(engine) as db:
+        row = db.get(SessionRow, session_id)
+        if row is not None and _session_payload(row) == sent:
+            row.synced = True
+            db.add(row)
+            db.commit()
+
+
+async def _sync_sessions_once(
+    engine,
+    client: httpx.AsyncClient,
+    url: str,
+    headers: dict,
+    *,
+    device_id: str,
+    api_key: str,
+) -> int:
+    """Sends each new or changed session (started, stopped) of this device to
+    the `upsert_session` RPC, which checks the API key like ingest_readings.
+    Raises on failure; unsent sessions stay unsynced and go out next cycle.
+    Returns how many were sent."""
+    rows = await asyncio.to_thread(_fetch_unsynced_sessions, engine, device_id)
+    for row in rows:
+        sent = _session_payload(row)
+        response = await client.post(
+            url,
+            headers=headers,
+            json={"p_device_id": device_id, "p_api_key": api_key, "p_session": sent},
+        )
+        response.raise_for_status()
+        await asyncio.to_thread(_mark_session_synced, engine, row.session_id, sent)
+    if rows:
+        logger.info("sync: sent details of %d session(s) to Supabase", len(rows))
+    return len(rows)
+
+
 async def run_sync_worker(
     *,
     engine,
@@ -152,6 +221,8 @@ async def run_sync_worker(
     client = client or httpx.AsyncClient(timeout=10.0)
 
     url = f"{supabase_url.rstrip('/')}/rest/v1/rpc/{ingest_function}"
+    session_url = f"{supabase_url.rstrip('/')}/rest/v1/rpc/{SESSION_FUNCTION}"
+    last_session_warning = float("-inf")
     headers = {
         "apikey": supabase_key,
         "Authorization": f"Bearer {supabase_key}",
@@ -178,6 +249,20 @@ async def run_sync_worker(
                 )
             except Exception:
                 logger.exception("sync: unexpected error in sync cycle")
+            # Session details go separately, after readings, so a failure here
+            # (e.g. the sessions migration not applied yet) never holds them up.
+            try:
+                await _sync_sessions_once(
+                    engine, client, session_url, headers, device_id=device_id, api_key=api_key
+                )
+            except Exception as error:
+                if time.monotonic() - last_session_warning >= SESSION_WARN_EVERY_S:
+                    last_session_warning = time.monotonic()
+                    logger.warning(
+                        "sync: couldn't send session details (%s); readings still sync. "
+                        "Is supabase/migrations/20261115120000_sessions.sql applied?",
+                        error,
+                    )
             await asyncio.sleep(interval_seconds)
     finally:
         if owns_client:

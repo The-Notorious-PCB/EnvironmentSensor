@@ -30,10 +30,9 @@ export interface ReadingRow {
   device_id: string;
 }
 
-/** One row from the `device_sessions` view (supabase/migrations) — a
- * derived summary of readings grouped by session, since session metadata
- * itself isn't synced to Supabase (see
- * collector/README.md#cloud-sync-supabase's "Not synced yet" note).
+/** One row from the `device_sessions` view (supabase/migrations): readings
+ * grouped by session, plus the session's name from the `sessions` table the
+ * collector syncs (20261115120000_sessions.sql).
  */
 export interface DeviceSessionRow {
   session_id: string;
@@ -41,4 +40,7 @@ export interface DeviceSessionRow {
   start_time: string;
   end_time: string;
   reading_count: number;
+  /** Null if the session was started without one, or before names were
+   * synced; missing until that migration is applied. */
+  name?: string | null;
 }

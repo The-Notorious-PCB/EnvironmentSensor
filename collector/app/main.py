@@ -64,6 +64,7 @@ def create_app(
         broadcast_manager = BroadcastManager()
 
         app.state.engine = engine
+        app.state.device_id = device_id or None
         app.state.session_manager = session_manager
         app.state.broadcast_manager = broadcast_manager
         app.state.queue = queue

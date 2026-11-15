@@ -37,4 +37,6 @@ export interface SessionSummary {
   start_time: string;
   end_time: string | null;
   notes: string | null;
+  /** Set with record.py --session-name, or "name" in POST /sessions. */
+  name?: string | null;
 }

@@ -20,6 +20,15 @@ class Session(SQLModel, table=True):
     start_time: datetime
     end_time: Optional[datetime] = None
     notes: Optional[str] = None
+    # Shown on the website's History page and the dashboard's playback list.
+    name: Optional[str] = None
+    # The registered device (COLLECTOR_DEVICE_ID) this collector ran as when
+    # the session started. One laptop's database can hold sessions of several
+    # devices, so session sync only sends a session under its own device.
+    device_id: Optional[str] = Field(default=None, index=True)
+    # Whether the session's details (above) have been sent to Supabase since
+    # they last changed (start, stop). See app.sync.worker.
+    synced: bool = Field(default=False, index=True)
 
     readings: list["Reading"] = Relationship(back_populates="session")
 
