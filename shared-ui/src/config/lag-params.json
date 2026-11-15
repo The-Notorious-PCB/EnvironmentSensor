@@ -37,10 +37,11 @@
       "filter": 16,
       "max": null,
       "min": 0,
+      "min_step": 62.0,
       "model": "one_tau",
       "part": "ExplorIR-M",
       "tau": 12.0,
-      "window": 7
+      "window": 3
     }
   }
 }
